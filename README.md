@@ -14,3 +14,10 @@ issue.
 ```
 pip install -r REQUIREMENT.txt
 ```
+
+- Usage
+```
+python passthrough_hpcc.py ip mountpoint
+```
+
+- Navigate to the mountpoint to see files on the HPCC cluster
