@@ -7,3 +7,10 @@ https://www.stavros.io/posts/python-fuse-filesystem/
 
 If you see anything needing improvement or have any feedback, please open an
 issue.
+
+
+# Notes
+- Install dependencies by running
+```
+pip install -r REQUIREMENT.txt
+```
