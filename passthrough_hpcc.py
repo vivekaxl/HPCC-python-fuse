@@ -2,14 +2,10 @@
 
 from __future__ import with_statement
 
-import os
 import sys
 import errno
-import urllib2
-import re
 import utility
-import ujson
-import xmltodict
+import logging
 
 from fuse import FUSE, FuseOSError, Operations
 
@@ -32,24 +28,20 @@ class Passthrough(Operations):
     def _is_file(self, filename):
         if filename == "": modified_path = ""
         elif filename != "/":
-            # import pdb
-            # pdb.set_trace()
             modified_path = filename[0] + filename[1:].replace("/", "::")
         else:
             modified_path = ""
-        url = self._get_url() + "WsDfu/DFUInfo?ver_=1.31&wsdl"
+        url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
         result = utility.get_result(url, modified_path)
-        if 'DFULogicalFiles' in result.keys():
-            return False
-        else:
-            return True
+        if 'DFULogicalFiles' in result.keys(): return False
+        else: return True
 
 
     # Filesystem methods
     # ==================
     # Read Only
     def access(self, path, mode):
-        return True  # Assumption: All the files are readable by the user
+        return False  # Assumption: All the files are readable by the user
 
     # !Read Only
     def chmod(self, path, mode):
@@ -62,10 +54,8 @@ class Passthrough(Operations):
     # Read Only
     def getattr(self, path, fh=None):
         def _is_dir(result):
-            if 'DFULogicalFiles' in result.keys():
-                return True
-            else:
-                return False
+            if 'DFULogicalFiles' in result.keys(): return True
+            else: return False
 
         def _get_ctimed(result):
             all_ctime = [utility.unix_time(element['Modified']) for element in result['DFULogicalFiles'] \
@@ -74,9 +64,12 @@ class Passthrough(Operations):
             return max(all_ctime)
 
         def _get_ctimef(result, path):
+            print "_get_ctimef > ", "path: ", path
+            if 'FileDetail' not in result.keys(): return
             return utility.unix_time(result['FileDetail']['Modified'])
 
         def _get_sizef(result):
+            if 'FileDetail' not in result.keys(): return
             return int(result['FileDetail']['Filesize'].replace(',', ''))
 
         def _get_nlinksf(result):
@@ -94,13 +87,18 @@ class Passthrough(Operations):
             """ refer to http://stackoverflow.com/questions/35375084/c-unix-how-to-extract-the-bits-from-st-mode """
             return 16877
 
+        print "getattr: ", path
         if path != "/":
-            modified_path = path[0] + path[1:].replace("/", "::")
+            modified_path = path[1:].replace("/", "::")
         else:
             modified_path = ""
+
+        # logging.debug("getattr: 1. %s", str(modified_path))
         url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
+        # logging.debug("getattr: 2. URL requested : " + str(url))
         result = utility.get_result(url, modified_path)
         if _is_dir(result):
+            # logging.debug("getattr: 2.1. It is a directory")
             return_dict = {
                 'st_ctime': _get_ctimed(result),
                 'st_mtime': _get_ctimed(result),
@@ -133,24 +131,25 @@ class Passthrough(Operations):
     # Read Only
     def readdir(self, path, fh):
         def _readdir(modified_path):
-            url = self.geturl() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
+            url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
             result = utility.get_result(url, modified_path)
-            files = [element['Name'] for element in result['DFULogicalFiles'] \
+            files = [element['Name'].split("::")[-1] for element in result['DFULogicalFiles'] \
                 ['DFULogicalFile'] if element['isDirectory'] is False]
             folders = [element['Directory'] for element in result['DFULogicalFiles'] \
                 ['DFULogicalFile'] if element['isDirectory'] is True]
             return files + folders
 
         if path != "/":
-            modified_path = path[0] + path[1:].replace("/", "::")
+            modified_path = path[1:].replace("/", "::")
         else:
             modified_path = ""
+        logging.debug("readdir: 1. %s", modified_path)
         dirents = ['.', '..']
         # Need to check if path is a dir but
         # I am checking if it a file or not
         if self._is_file(modified_path) is False:
             dirents = _readdir(modified_path)
-        # print dirents
+        logging.debug("readdir: 2. files and folders %s", ",".join(dirents))
         for r in dirents:
             yield r
 
@@ -171,7 +170,12 @@ class Passthrough(Operations):
 
     # Read Only
     def statfs(self, path):
-        raise Exception(errno.EPERM)
+        return_dict = {'f_bsize': 4096, 'f_bavail': 22106710, 'f_favail': 6104275,
+                       'f_files': 6365184, 'f_frsize': 4096, 'f_blocks': 24930076,
+                       'f_ffree': 6104275, 'f_bfree': 23383842, 'f_namemax': 255,
+                       'f_flag': 4097}  # f_flag has been changes to read only and to not use uids. Rest
+                        # of the data is junk
+        return return_dict
 
     # !Read Only
     def unlink(self, path):
@@ -235,4 +239,4 @@ def main(mountpoint, ip="10.239.227.6"):
 
 if __name__ == '__main__':
     # Usage: python passthrough_hpcc.py ip mountpoint
-    main(sys.argv[2])
+    main(sys.argv[2], sys.argv[1])

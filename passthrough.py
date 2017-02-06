@@ -17,7 +17,7 @@ class Passthrough(Operations):
     # =======
 
     def _full_path(self, partial):
-        print "_full_path"
+        # print "_full_path"
         if partial.startswith("/"):
             partial = partial[1:]
         path = os.path.join(self.root, partial)
@@ -27,7 +27,7 @@ class Passthrough(Operations):
     # ==================
     # Read Only
     def access(self, path, mode):
-        print "access"
+        # print "access"
         full_path = self._full_path(path)
         if not os.access(full_path, mode):
             raise FuseOSError(errno.EACCES)
@@ -46,7 +46,7 @@ class Passthrough(Operations):
 
     # Read Only
     def getattr(self, path, fh=None):
-        print "getattr: "
+        # print "getattr: "
         full_path = self._full_path(path)
         st = os.lstat(full_path)
         temp = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
@@ -57,7 +57,7 @@ class Passthrough(Operations):
 
     # Read Only
     def readdir(self, path, fh):
-        print "readdir" + "-"*10
+        # print "readdir" + "-"*10
         full_path = self._full_path(path)
         # print "Path: ", path
         # print "Full Path: ", full_path
@@ -65,8 +65,8 @@ class Passthrough(Operations):
         if os.path.isdir(full_path):
             dirents.extend(os.listdir(full_path))
         # print "Path: ", path
-        for r in dirents: print r
-        print "---" * 10
+        # for r in dirents: print r
+        # print "---" * 10
         for r in dirents:
             yield r
 
@@ -100,9 +100,11 @@ class Passthrough(Operations):
         print "statfs"
         full_path = self._full_path(path)
         stv = os.statvfs(full_path)
-        return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
+        temp = dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
             'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
             'f_frsize', 'f_namemax'))
+        print temp
+        return temp
 
     # !Read Only
     def unlink(self, path):
