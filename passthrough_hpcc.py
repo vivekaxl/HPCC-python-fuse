@@ -3,14 +3,28 @@
 from __future__ import with_statement
 
 import sys
-import errno
 import utility
 import logging
 import os
-import signal
-from fuse import FUSE, FuseOSError, Operations
+from fuse import FUSE,  Operations
 
+# Temporary Directory to store the files. This to help in reading
 TEMP_DIR = "./TEMP"
+
+# Adding logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# create a file handler
+handler = logging.FileHandler('HISTORY.log')
+handler.setLevel(logging.INFO)
+
+# create a logging format
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+
+# add the handlers to the logger
+logger.addHandler(handler)
 
 
 class Passthrough(Operations):
@@ -22,31 +36,44 @@ class Passthrough(Operations):
     # Helpers
     # =======
     def _cleanup(self):
-        print "Clean up"
+        """Cleaning up the files stored from the last session"""
+        # TODO: Need to add functionality so that the files are deleted at SIGINT
+        logger.info("_cleanup: Clean up started")
         os.system("rm -rf " + TEMP_DIR + "/*")
+        logger.info("_cleanup: Clean up finished")
 
     def _get_url(self):
         if self.ip != "":
             url = "http://" + self.ip + ":" + self.port + "/"
+            logger.info("_geturl: The url is: " + url)
         else:
+            logger.info("_geturl: Ip address is invalid")
             raise ValueError("Ip address is invalid")
         return url
 
-    def _is_file(self, filename):
-        if filename == "": modified_path = ""
-        elif filename != "/":
-            modified_path = filename[0] + filename[1:].replace("/", "::")
+    def _is_file(self, pathname):
+        """Check if the pathname passed is a filename of not"""
+        if pathname == "": modified_path = ""
+        elif pathname != "/":
+            modified_path = pathname[0] + pathname[1:].replace("/", "::")
         else:
             modified_path = ""
         url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
         result = utility.get_result(url, modified_path)
-        if 'DFULogicalFiles' in result.keys(): return False
-        else: return True
+
+        if 'DFULogicalFiles' in result.keys():
+            logger.info("_is_file: True, Pathname: " + pathname)
+            return False
+        else:
+            logger.info("_is_file: False, Pathname: " + pathname)
+            return True
 
     def _get_data(self, filename):
-        url = self._get_url() +"WsDfu/DFUBrowseData?ver_=1.31&wsdl"
-        print "_get_data: ", url
+        """ Getting data from a filename"""
+        url = self._get_url() + "WsDfu/DFUBrowseData?ver_=1.31&wsdl"
+        logger.info("_get_data: ", url)
         result = utility.get_data(url, filename)
+        logger.info("_get_data: Data returned is " + result)
         return result
 
 
@@ -55,14 +82,6 @@ class Passthrough(Operations):
     # Read Only
     def access(self, path, mode):
         return False  # Assumption: All the files are readable by the user
-
-    # !Read Only
-    def chmod(self, path, mode):
-        raise Exception(errno.EPERM)
-
-    # !Read Only
-    def chown(self, path, uid, gid):
-        raise Exception(errno.EPERM)
 
     # Read Only
     def getattr(self, path, fh=None):
@@ -78,8 +97,8 @@ class Passthrough(Operations):
 
         def _get_ctimef(result, path):
             if path.split('/')[-1][0] == '.': return -1
-            print "_get_ctimef > ", "path: ", path
-            if 'FileDetail' not in result.keys(): return
+            logger.info("_get_ctimef > " + "path: " + path)
+            if 'FileDetail' not in result.keys(): return -1
             return utility.unix_time(result['FileDetail']['Modified'])
 
         def _get_sizef(result):
@@ -101,7 +120,7 @@ class Passthrough(Operations):
             """ refer to http://stackoverflow.com/questions/35375084/c-unix-how-to-extract-the-bits-from-st-mode """
             return 16877
 
-        print "getattr: ", path
+        logger.info("getattr: " + str(path))
 
         if path != "/":
             if path.split('/')[-1][0] == '.': return {
@@ -119,12 +138,12 @@ class Passthrough(Operations):
         else:
             modified_path = ""
 
-        # logging.debug("getattr: 1. %s", str(modified_path))
+        logger.info("getattr: 1. %s", str(modified_path))
         url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
-        # logging.debug("getattr: 2. URL requested : " + str(url))
+        logger.info("getattr: 2. URL requested : " + str(url))
         result = utility.get_result(url, modified_path)
         if _is_dir(result):
-            # logging.debug("getattr: 2.1. It is a directory")
+            logger.debug("getattr: 2.1. It is a directory")
             return_dict = {
                 'st_ctime': _get_ctimed(result),
                 'st_mtime': _get_ctimed(result),
@@ -152,8 +171,6 @@ class Passthrough(Operations):
             }
         return return_dict
 
-
-
     # Read Only
     def readdir(self, path, fh):
         def _readdir(modified_path):
@@ -170,118 +187,54 @@ class Passthrough(Operations):
             modified_path = path[1:].replace("/", "::")
         else:
             modified_path = ""
-        logging.debug("readdir: 1. %s", modified_path)
+        logger.info("readdir: 1. %s", modified_path)
         dirents = ['.', '..']
         # Need to check if path is a dir but
         # I am checking if it a file or not
         if self._is_file(modified_path) is False:
             dirents = _readdir(modified_path)
-        logging.debug("readdir: 2. files and folders %s", ",".join(dirents))
+        logger.info("readdir: 2. files and folders %s", ",".join(dirents))
         for r in dirents:
             yield r
-
-    # Read Only
-    def readlink(self, path):
-        raise Exception(errno.EPERM)
-
-    def mknod(self, path, mode, dev):
-        raise Exception(errno.EPERM)
-
-    # !Read Only
-    def rmdir(self, path):
-        raise Exception(errno.EPERM)
-
-    # !Read Only
-    def mkdir(self, path, mode):
-        raise Exception(errno.EPERM)
 
     # Read Only
     def statfs(self, path):
         return_dict = {'f_bsize': 4096, 'f_bavail': 22106710, 'f_favail': 6104275,
                        'f_files': 6365184, 'f_frsize': 4096, 'f_blocks': 24930076,
                        'f_ffree': 6104275, 'f_bfree': 23383842, 'f_namemax': 255,
-                       'f_flag': 4097}  # f_flag has been changes to read only and to not use uids. Rest
-                        # of the data is junk
+                       'f_flag': 4097}
+        # f_flag has been changes to read only and to not use uids. Rest of the data is junk
         return return_dict
-
-    # !Read Only
-    def unlink(self, path):
-        raise Exception(errno.EPERM)
-
-    # !Read Only
-    def symlink(self, name, target):
-        raise Exception(errno.EPERM)
-
-    # !Read Only
-    def rename(self, old, new):
-        raise Exception(errno.EPERM)
-
-    # !Read Only
-    def link(self, target, name):
-        raise Exception(errno.EPERM)
-
-    # Read Only
-    def utimens(self, path, times=None):
-        raise Exception(errno.EPERM)
 
     # File methods
     # ============
-
     # Read Only
     def open(self, path, flags):
-        print "Open Path: ", path, flags
+        logger.info("Open: Path: ", path, flags)
         filename = path.split('/')[-1]
         full_path = TEMP_DIR + path
-        print ">> " * 10 , full_path
         parent_path = '/'.join(full_path.split('/')[:-1])
-        print ">> " * 10, "Parent Path: ", parent_path
+        if os.path.exists(full_path): return os.open(full_path, flags)
         if not os.path.exists(parent_path): os.makedirs(parent_path)
         # get data
         modified_path = path[1:].replace("/", "::")
         data = self._get_data(modified_path)
-
-        open(parent_path + '/' + filename, 'w').write("\n".join(data))
-        return os.open(parent_path + '/' + filename, flags)
-
-    # !Read Only
-    def create(self, path, mode, fi=None):
-        raise Exception(errno.EPERM)
+        logger.info("Open: File Created: " + full_path)
+        open(full_path, 'w').write(data)
+        return os.open(full_path, flags)
 
     # Read Only
     def read(self, path, length, offset, fh):
         os.lseek(fh, offset, os.SEEK_SET)
         return os.read(fh, length)
 
-    # !Read Only
-    def write(self, path, buf, offset, fh):
-        raise Exception(errno.EPERM)
-
-    # !Read Only
-    def truncate(self, path, length, fh=None):
-        raise Exception(errno.EPERM)
-
-    # # !Read Only
-    # def flush(self, path, fh):
-    #     raise Exception(errno.EPERM)
-
     # Read Only
     def release(self, path, fh):
         return os.close(fh)
 
-    # !Read Only
-    def fsync(self, path, fdatasync, fh):
-        raise Exception(errno.EPERM)
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        print "Clean up"
-        os.system("rm -rf " + TEMP_DIR + "/*")
-
 
 def main(mountpoint, ip="10.239.227.6"):
     FUSE(Passthrough(ip), mountpoint, nothreads=True, foreground=True)
-
-
-
 
 if __name__ == '__main__':
     # Usage: python passthrough_hpcc.py ip mountpoint

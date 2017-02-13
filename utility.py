@@ -50,7 +50,7 @@ def get_data(url, scope, count=20):
     result = [result for result in results if '<Row>' in result]
     try:
         # Get the data between line
-        lines = [return_tag(line) for line in result]
+        lines = '\n'.join([return_tag(line) for line in result])
         return lines
     except:
         import xmltodict, json
