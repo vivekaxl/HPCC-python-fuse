@@ -1,9 +1,7 @@
-# python-fuse-sample
+# HPCC-python-fuse
 
-This repo contains a very simple FUSE filesystem example in Python. It's the
-code from a post I wrote a while back:
-
-https://www.stavros.io/posts/python-fuse-filesystem/
+This repo contains a HPCCe FUSE filesystem. This is based on the [this](https://www.stavros.io/posts/python-fuse-filesystem/)
+project. 
 
 If you see anything needing improvement or have any feedback, please open an
 issue.
