@@ -6,17 +6,24 @@ import sys
 import errno
 import utility
 import logging
-
+import os
+import signal
 from fuse import FUSE, FuseOSError, Operations
+
+TEMP_DIR = "./TEMP"
 
 
 class Passthrough(Operations):
     def __init__(self, ip, port="8010"):
         self.ip = ip
         self.port = port
+        self._cleanup()
 
     # Helpers
     # =======
+    def _cleanup(self):
+        print "Clean up"
+        os.system("rm -rf " + TEMP_DIR + "/*")
 
     def _get_url(self):
         if self.ip != "":
@@ -35,6 +42,12 @@ class Passthrough(Operations):
         result = utility.get_result(url, modified_path)
         if 'DFULogicalFiles' in result.keys(): return False
         else: return True
+
+    def _get_data(self, filename):
+        url = self._get_url() +"WsDfu/DFUBrowseData?ver_=1.31&wsdl"
+        print "_get_data: ", url
+        result = utility.get_data(url, filename)
+        return result
 
 
     # Filesystem methods
@@ -64,6 +77,7 @@ class Passthrough(Operations):
             return max(all_ctime)
 
         def _get_ctimef(result, path):
+            if path.split('/')[-1][0] == '.': return -1
             print "_get_ctimef > ", "path: ", path
             if 'FileDetail' not in result.keys(): return
             return utility.unix_time(result['FileDetail']['Modified'])
@@ -88,7 +102,19 @@ class Passthrough(Operations):
             return 16877
 
         print "getattr: ", path
+
         if path != "/":
+            if path.split('/')[-1][0] == '.': return {
+                'st_ctime': -1,
+                'st_mtime': -1,
+                'st_nlinks': -1,
+                'st_mode': -1,
+                # Since it is a folder always return 4096
+                'st_size': -1,
+                'st_gid': -1,
+                'st_uid': -1,
+                'st_atime': -1
+            }
             modified_path = path[1:].replace("/", "::")
         else:
             modified_path = ""
@@ -137,6 +163,7 @@ class Passthrough(Operations):
                 ['DFULogicalFile'] if element['isDirectory'] is False]
             folders = [element['Directory'] for element in result['DFULogicalFiles'] \
                 ['DFULogicalFile'] if element['isDirectory'] is True]
+            # result = [f for f in files.extend(folders) if f.split('/')[0] != '.']
             return files + folders
 
         if path != "/":
@@ -202,7 +229,19 @@ class Passthrough(Operations):
 
     # Read Only
     def open(self, path, flags):
-        raise Exception(errno.EPERM)
+        print "Open Path: ", path, flags
+        filename = path.split('/')[-1]
+        full_path = TEMP_DIR + path
+        print ">> " * 10 , full_path
+        parent_path = '/'.join(full_path.split('/')[:-1])
+        print ">> " * 10, "Parent Path: ", parent_path
+        if not os.path.exists(parent_path): os.makedirs(parent_path)
+        # get data
+        modified_path = path[1:].replace("/", "::")
+        data = self._get_data(modified_path)
+
+        open(parent_path + '/' + filename, 'w').write("\n".join(data))
+        return os.open(parent_path + '/' + filename, flags)
 
     # !Read Only
     def create(self, path, mode, fi=None):
@@ -210,7 +249,8 @@ class Passthrough(Operations):
 
     # Read Only
     def read(self, path, length, offset, fh):
-        raise Exception(errno.EPERM)
+        os.lseek(fh, offset, os.SEEK_SET)
+        return os.read(fh, length)
 
     # !Read Only
     def write(self, path, buf, offset, fh):
@@ -220,23 +260,30 @@ class Passthrough(Operations):
     def truncate(self, path, length, fh=None):
         raise Exception(errno.EPERM)
 
-    # !Read Only
-    def flush(self, path, fh):
-        raise Exception(errno.EPERM)
+    # # !Read Only
+    # def flush(self, path, fh):
+    #     raise Exception(errno.EPERM)
 
     # Read Only
     def release(self, path, fh):
-        raise Exception(errno.EPERM)
+        return os.close(fh)
 
     # !Read Only
     def fsync(self, path, fdatasync, fh):
         raise Exception(errno.EPERM)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        print "Clean up"
+        os.system("rm -rf " + TEMP_DIR + "/*")
 
 
 def main(mountpoint, ip="10.239.227.6"):
     FUSE(Passthrough(ip), mountpoint, nothreads=True, foreground=True)
 
 
+
+
 if __name__ == '__main__':
     # Usage: python passthrough_hpcc.py ip mountpoint
+
     main(sys.argv[2], sys.argv[1])
