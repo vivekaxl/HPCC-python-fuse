@@ -21,3 +21,10 @@ python passthrough_hpcc.py ip mountpoint
 ```
 
 - Navigate to the mountpoint to see files on the HPCC cluster
+
+- Currently the program can read both .csv files as well as thor files. Thor files are stored as a json while .csv files
+ are stored in their actual format. 
+# Details
+- open() - The program downloads 20 rows from a dataset and saves it to the ./TEMP folder.
+- read() - Reads from the ./TEMP directory
+- During initialization the clean up method is called which clears the ./TEMP folder.
