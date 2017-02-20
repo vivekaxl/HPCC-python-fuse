@@ -26,3 +26,4 @@ python passthrough_hpcc.py ip mountpoint
 - open() - The program downloads 20 rows from a dataset and saves it to the ./TEMP folder.
 - read() - Reads from the ./TEMP directory
 - During initialization the clean up method is called which clears the ./TEMP folder.
+- Added [caching](https://github.com/vivekaxl/HPCC-python-fuse/blob/master/cache.py) using OrderedDict and implemented for readdir() and getattr(). A considerable improvement can be observed after the first WS call.

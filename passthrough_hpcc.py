@@ -255,7 +255,7 @@ def main(mountpoint, ip="10.239.227.6"):
 
 if __name__ == '__main__':
     # Usage: python passthrough_hpcc.py ip mountpoint
-    # try:
+    try:
         main(sys.argv[2], sys.argv[1])
-    # except:
-    #     print "Usage: python passthrough_hpcc.py ip mountpoint"
+    except:
+        print "Usage: python passthrough_hpcc.py ip mountpoint"
