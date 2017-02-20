@@ -74,10 +74,10 @@ class Passthrough(Operations):
     def _get_data(self, filename):
         """ Getting data from a filename"""
         url = self._get_url() + "WsDfu/DFUBrowseData?ver_=1.31&wsdl"
-        logger.info("_get_data: ", url)
+        logger.info("_get_data: {0}".format(url))
         result = utility.get_data(url, filename)
         logger.info("_get_data: Data returned is " + result)
-        return result
+        return result.encode('utf-8').strip()
 
     # Filesystem methods
     # ==================
@@ -124,7 +124,7 @@ class Passthrough(Operations):
 
         logger.info("getattr: " + str(path))
 
-        cached_entry = self.cache.get_entry(path, 'getattr', logger)
+        cached_entry = self.cache.get_entry(path, 'getattr')
         if cached_entry is not None:
             return cached_entry
 
@@ -200,7 +200,7 @@ class Passthrough(Operations):
 
         logger.info("readdir: 1. %s", modified_path)
 
-        cached_entry = self.cache.get_entry(modified_path, 'readdir', logger)
+        cached_entry = self.cache.get_entry(modified_path, 'readdir')
         if cached_entry is not None:
             dirents = cached_entry
         else:
@@ -228,7 +228,7 @@ class Passthrough(Operations):
     # ============
     # Read Only
     def open(self, path, flags):
-        logger.info("Open: Path: ", path, flags)
+        logger.info("Open: Path: %s, %s", path, flags)
         full_path = TEMP_DIR + path
         parent_path = '/'.join(full_path.split('/')[:-1])
         if os.path.exists(full_path): return os.open(full_path, flags)
