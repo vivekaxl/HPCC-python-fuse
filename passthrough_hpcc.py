@@ -7,9 +7,10 @@ import utility
 import logging
 import os
 from fuse import FUSE,  Operations
+from cache import cache
 
 # Temporary Directory to store the files. This to help in reading
-TEMP_DIR = "./TEMP"
+TEMP_DIR = "./.AUX/TEMP"
 
 # Adding logger
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,7 @@ class Passthrough(Operations):
         self.ip = ip
         self.port = port
         self._cleanup()
+        self.cache = cache(ip, logger)
 
     # Helpers
     # =======
@@ -40,6 +42,7 @@ class Passthrough(Operations):
         # TODO: Need to add functionality so that the files are deleted at SIGINT
         logger.info("_cleanup: Clean up started")
         os.system("rm -rf " + TEMP_DIR + "/*")
+        os.system("rm -rf ./.AUX/*.p")
         logger.info("_cleanup: Clean up finished")
 
     def _get_url(self):
@@ -75,7 +78,6 @@ class Passthrough(Operations):
         result = utility.get_data(url, filename)
         logger.info("_get_data: Data returned is " + result)
         return result
-
 
     # Filesystem methods
     # ==================
@@ -122,18 +124,25 @@ class Passthrough(Operations):
 
         logger.info("getattr: " + str(path))
 
+        cached_entry = self.cache.get_entry(path, 'getattr', logger)
+        if cached_entry is not None:
+            return cached_entry
+
         if path != "/":
-            if path.split('/')[-1][0] == '.': return {
-                'st_ctime': -1,
-                'st_mtime': -1,
-                'st_nlinks': -1,
-                'st_mode': -1,
-                # Since it is a folder always return 4096
-                'st_size': -1,
-                'st_gid': -1,
-                'st_uid': -1,
-                'st_atime': -1
-            }
+            if path.split('/')[-1][0] == '.':
+                return_dict = {
+                    'st_ctime': -1,
+                    'st_mtime': -1,
+                    'st_nlinks': -1,
+                    'st_mode': -1,
+                    # Since it is a folder always return 4096
+                    'st_size': -1,
+                    'st_gid': -1,
+                    'st_uid': -1,
+                    'st_atime': -1
+                }
+                self.cache.set_entry(path, 'getattr', return_dict)
+                return return_dict
             modified_path = path[1:].replace("/", "::")
         else:
             modified_path = ""
@@ -169,6 +178,9 @@ class Passthrough(Operations):
                 'st_uid': 1000,
                 'st_atime': _get_ctimef(result, modified_path)
             }
+
+        self.cache.set_entry(path, 'getattr', return_dict)
+
         return return_dict
 
     # Read Only
@@ -183,17 +195,23 @@ class Passthrough(Operations):
             # result = [f for f in files.extend(folders) if f.split('/')[0] != '.']
             return files + folders
 
-        if path != "/":
-            modified_path = path[1:].replace("/", "::")
-        else:
-            modified_path = ""
+        if path != "/": modified_path = path[1:].replace("/", "::")
+        else: modified_path = ""
+
         logger.info("readdir: 1. %s", modified_path)
-        dirents = ['.', '..']
-        # Need to check if path is a dir but
-        # I am checking if it a file or not
-        if self._is_file(modified_path) is False:
-            dirents = _readdir(modified_path)
-        logger.info("readdir: 2. files and folders %s", ",".join(dirents))
+
+        cached_entry = self.cache.get_entry(modified_path, 'readdir', logger)
+        if cached_entry is not None:
+            dirents = cached_entry
+        else:
+            dirents = ['.', '..']
+            # Need to check if path is a dir but
+            # I am checking if it a file or not
+            if self._is_file(modified_path) is False:
+                dirents = _readdir(modified_path)
+            logger.info("readdir: 2. files and folders %s", ",".join(dirents))
+            self.cache.set_entry(modified_path, 'readdir', dirents)
+
         for r in dirents:
             yield r
 
@@ -211,7 +229,6 @@ class Passthrough(Operations):
     # Read Only
     def open(self, path, flags):
         logger.info("Open: Path: ", path, flags)
-        filename = path.split('/')[-1]
         full_path = TEMP_DIR + path
         parent_path = '/'.join(full_path.split('/')[:-1])
         if os.path.exists(full_path): return os.open(full_path, flags)
@@ -238,7 +255,7 @@ def main(mountpoint, ip="10.239.227.6"):
 
 if __name__ == '__main__':
     # Usage: python passthrough_hpcc.py ip mountpoint
-    try:
+    # try:
         main(sys.argv[2], sys.argv[1])
-    except:
-        print "Usage: python passthrough_hpcc.py ip mountpoint"
+    # except:
+    #     print "Usage: python passthrough_hpcc.py ip mountpoint"
