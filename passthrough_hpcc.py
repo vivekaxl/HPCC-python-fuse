@@ -136,7 +136,8 @@ class Passthrough(Operations):
                     'st_nlinks': -1,
                     'st_mode': -1,
                     # Since it is a folder always return 4096
-                    'st_size': -1,
+                    'st_size': sys.maxint,
+                    # 'st_size': -1,
                     'st_gid': -1,
                     'st_uid': -1,
                     'st_atime': -1
@@ -172,7 +173,6 @@ class Passthrough(Operations):
                 'st_mtime': _get_ctimef(result, modified_path),
                 'st_nlinks': _get_nlinksf(result),
                 'st_mode': _get_st_modef(result),
-                # Since it is a folder always return 4096
                 'st_size': _get_sizef(result),
                 'st_gid': 1000,
                 'st_uid': 1000,
@@ -237,11 +237,13 @@ class Passthrough(Operations):
         modified_path = path[1:].replace("/", "::")
         data = self._get_data(modified_path)
         logger.info("Open: File Created: " + full_path)
+
         open(full_path, 'w').write(data)
         return os.open(full_path, flags)
 
     # Read Only
     def read(self, path, length, offset, fh):
+        print "> " * 10, " Length: ", length, "offset: ", offset, " path: ", path
         os.lseek(fh, offset, os.SEEK_SET)
         return os.read(fh, length)
 

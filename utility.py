@@ -38,13 +38,13 @@ def unix_time(time_string):
     return (dt - epoch).total_seconds() * 1000.0
 
 
-def get_data(url, scope, count=20):
+def get_data(url, scope, start=0, count=100):
     def return_tag(line, tag="line"):
         soup = BeautifulSoup(line, "html.parser")
         return soup.line.string
 
     client = Client(url)
-    response = client.service.DFUBrowseData(LogicalName=scope, Count=count)
+    response = client.service.DFUBrowseData(LogicalName=scope, Start=start, Count=count)
     results = response.Result.split('\n')
     # only get the lines which has the tag <Row>
     result = [result for result in results if '<Row>' in result]
