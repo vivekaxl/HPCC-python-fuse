@@ -8,12 +8,13 @@ import logging
 import os
 from fuse import FUSE,  Operations
 from cache import cache
+from read_cache import ReadCache
 
 # Temporary Directory to store the files. This to help in reading
 TEMP_DIR = "./.AUX/TEMP"
 
 # Adding logger
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 # create a file handler
@@ -34,6 +35,7 @@ class Passthrough(Operations):
         self.port = port
         self._cleanup()
         self.cache = cache(ip, logger)
+        self.read_cache = ReadCache(logger, ip, port)
 
     # Helpers
     # =======
@@ -228,28 +230,18 @@ class Passthrough(Operations):
     # ============
     # Read Only
     def open(self, path, flags):
-        logger.info("Open: Path: %s, %s", path, flags)
-        full_path = TEMP_DIR + path
-        parent_path = '/'.join(full_path.split('/')[:-1])
-        if os.path.exists(full_path): return os.open(full_path, flags)
-        if not os.path.exists(parent_path): os.makedirs(parent_path)
-        # get data
-        modified_path = path[1:].replace("/", "::")
-        data = self._get_data(modified_path)
-        logger.info("Open: File Created: " + full_path)
-
-        open(full_path, 'w').write(data)
-        return os.open(full_path, flags)
+        # return a dummy because path is passed in during read
+        return -1
 
     # Read Only
     def read(self, path, length, offset, fh):
-        print "> " * 10, " Length: ", length, "offset: ", offset, " path: ", path
-        os.lseek(fh, offset, os.SEEK_SET)
-        return os.read(fh, length)
+        print "read: ", path, length, offset
+        data = self.read_cache.get_data(path, offset, offset+length)
+        return data
 
     # Read Only
     def release(self, path, fh):
-        return os.close(fh)
+        return -1
 
 
 def main(mountpoint, ip="10.239.227.6"):
@@ -257,7 +249,7 @@ def main(mountpoint, ip="10.239.227.6"):
 
 if __name__ == '__main__':
     # Usage: python passthrough_hpcc.py ip mountpoint
-    try:
-        main(sys.argv[2], sys.argv[1])
-    except:
-        print "Usage: python passthrough_hpcc.py ip mountpoint"
+    # try:
+    main(sys.argv[2], sys.argv[1])
+    # except:
+        # print "Usage: python passthrough_hpcc.py ip mountpoint"

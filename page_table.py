@@ -41,7 +41,7 @@ class PageTable:
         if page_key in self.page_table[path]:
             self.logger.info('PageTable: create_entry(): The entry already exists. Something is wrong')
         else:
-            cache_file_path = self.aux_folder + path + "_" + str(part_no)
+            cache_file_path = self.aux_folder + path[1:] + "_" + str(part_no)
             self.page_table[path][page_key] = PageTableEntry(cache_file_path, start_record, end_record, start_byte, end_byte, part_no)
 
     def delete_entry(self, path, part_no):
@@ -61,9 +61,9 @@ class PageTable:
         if part_no not in self.page_table[path].keys():
             self.logger.info('PageTable: delete_entry(): The entry already exists. Something is wrong')
         else:
+            # updating only the cache file path.
             cache_file_path = self.aux_folder + path + "_" + str(part_no)
             self.page_table[path][part_no].set_cache_file_path(cache_file_path)
-
 
     def path_exists(self, path):
         if path in self.page_table.keys():
@@ -71,21 +71,6 @@ class PageTable:
             return True
         self.logger.info('PageTable: path_exists(): Path does not exist')
         return False
-
-    def fetch_page(self, path, start_byte, end_byte):
-        """
-        :param path: Path of the cache part file
-        :param start_byte: start byte of the cache part file
-        :param end_byte: end byte of the cache part file
-        :return:
-        """
-        #TODO - fix this
-        # creating a key for the page table
-        page_key = str(start_byte) + '--' + str(end_byte)
-        # update the access time of the page entry
-        self.page_table[path][page_key].update_access_time()
-        # return the page
-        return self.page_table[path][page_key]
 
     def lru_invalidate_page(self, path):
         # Find all the [cache_key, access_time] that has cached data
@@ -96,16 +81,23 @@ class PageTable:
         lru_page.invalidate_cache()
         return lru_page.get_cache_file_path()
 
-    def part_invalidate_page(self, path, part):
-        assert(part.if_cached is True), "Something is wrong"
+    def part_invalidate_page(self, path, part_no):
+        part = self.get_part(path, part_no)
+        assert (part.if_cached is True), "Something is wrong"
+        part.invalidate_cache()
+        assert (self.get_part(path, part_no).if_cached is False), "Something is wrong"
+
         part.invalidate_cache()
         return part.get_cache_file_path()
 
-    def part_validate_page(self, path, part):
+    def part_validate_page(self, path, part_no):
+        part = self.get_part(path, part_no)
         part.validate_cache()
+        assert(self.get_part(path, part_no).if_cached is True), "Something is wrong"
         return part.get_cache_file_path()
 
     def get_parts(self, path):
+        """ Get all the part numbers"""
         return self.page_table[path].keys()
 
     def get_cache_left(self, path):
@@ -144,4 +136,35 @@ class PageTable:
         return total_size
 
     def get_part(self, path, part_no):
+        """ Return the PageTableEntry of a specific part_no"""
         return self.page_table[path][part_no]
+
+    def get_parts_based_byte_position(self, path, start_byte, end_byte):
+        parts = self.get_parts(path)
+        object_parts = [self.get_part(path, part) for part in parts]
+        return_parts = []
+        for object_part in object_parts:
+            if object_part.get_start_byte() <= start_byte <= object_part.get_end_byte():
+                if object_part.get_part_no() not in [return_part.get_part_no() for return_part in return_parts]:
+                    return_parts.append(object_part)
+            if object_part.get_start_byte() <= end_byte <= object_part.get_end_byte():
+                if object_part.get_part_no() not in [return_part.get_part_no() for return_part in return_parts]:
+                    return_parts.append(object_part)
+
+        # the start byte and end byte position has never been fetched before
+        if len(return_parts) == 0: return -1
+        else: return return_parts
+
+    def if_accessed_before(self, path, part_no):
+        """
+        Checks if the part_no has been fetched before
+        :param path: path
+        :param part_no:
+        :return: True or False
+        """
+        if part_no in self.page_table[path].keys(): return True
+        return False
+
+    def get_ranges_of_parts(self, path, part_no):
+        part = self.get_part(path, part_no)
+        return [part.start_byte, part.end_byte]
