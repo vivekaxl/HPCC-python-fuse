@@ -216,7 +216,7 @@ class ReadCache:
                 abs_right = self.page_table.get_cache_right(path)
                 abs_right_part_no = abs_right.get_part_no()
                 to_fetch_part_no = abs_right_part_no + 1
-                ret_val = self.build_cache(path, abs_right.end_record + 1, to_fetch_part_no)
+                ret_val = self.build_cache(path, abs_right.end_record, to_fetch_part_no)
                 self.logger.info("ReadCache: get_data(): Getting other data: " + str(1 + 1 + count))
                 # if ret_val is -1 means the whole file has been fetched
                 if ret_val == -1 :
@@ -298,7 +298,7 @@ class ReadCache:
                         abs_right_part_no = abs_right.get_part_no()
                         assert(abs_right_part_no == new_part), "Something is wrong"
                         to_fetch_part_no = abs_right_part_no + 1
-                        self.build_cache(path, abs_right.end_record + 1, to_fetch_part_no)
+                        self.build_cache(path, abs_right.end_record, to_fetch_part_no)
                         part = self.page_table.get_part(path, to_fetch_part_no)
                         self.page_table.part_validate_page(path, part)
 
@@ -331,7 +331,7 @@ class ReadCache:
                 all_part_no = [self.page_table.get_part(path, part_no).get_part_no() for part_no in self.page_table.get_parts(path)]
                 if to_fetch_part_no not in all_part_no:
                     self.logger.info("ReadCache: get_data(): Part has not been fetched before hence move to right")
-                    ret_val = self.build_cache(path, abs_right.end_record+1, to_fetch_part_no)
+                    ret_val = self.build_cache(path, abs_right.end_record, to_fetch_part_no)
                     if ret_val == -1:
                         self.logger.info("ReadCache: get_data(): EOF has been reached: " + str(to_fetch_part_no))
                         break
