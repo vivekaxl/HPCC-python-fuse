@@ -2,7 +2,7 @@ from datetime import datetime
 
 
 class PageTableEntry:
-    def __init__(self, path, start_record, end_record, start_byte, end_byte, part_no):
+    def __init__(self, path, start_record, end_record, start_byte, end_byte, part_no, eof=False):
         """
         This is an entry which holds data of each page of a file
         :param path: thor file path
@@ -19,6 +19,7 @@ class PageTableEntry:
         self.cache_file_path = path
         self.if_cached = True  # if the data exists in the local repo
         self.access_time = datetime.now().microsecond  # last time when the page was accessed
+        self.EOF = eof # If this entry is the end of file
 
     def update_access_time(self):
         self.access_time = datetime.now().microsecond
@@ -52,3 +53,6 @@ class PageTableEntry:
 
     def get_start_record(self):
         return self.start_record
+
+    def get_eof(self):
+        return self.EOF

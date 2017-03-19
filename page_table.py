@@ -34,7 +34,7 @@ class PageTable:
         config.read("./config.ini")
         return str(config.get('AUX', 'folder'))
 
-    def create_entry(self, path, start_record, end_record, start_byte, end_byte, part_no):
+    def create_entry(self, path, start_record, end_record, start_byte, end_byte, part_no, eof=False):
         # creating a key for the page table
         page_key = part_no
         if path not in self.page_table.keys(): self.page_table[path] = {}
@@ -42,7 +42,10 @@ class PageTable:
             self.logger.info('PageTable: create_entry(): The entry already exists. Something is wrong')
         else:
             cache_file_path = self.aux_folder + path[1:] + "_" + str(part_no)
-            self.page_table[path][page_key] = PageTableEntry(cache_file_path, start_record, end_record, start_byte, end_byte, part_no)
+            self.page_table[path][page_key] = PageTableEntry(cache_file_path, start_record, end_record, start_byte,
+                                                             end_byte, part_no, eof=eof)
+            self.logger.info('PageTable: create_entry(): Entry created for ' + cache_file_path +
+                             "with start byte=" + str(start_byte) + " and end byte=" + str(end_byte))
 
     def delete_entry(self, path, part_no):
         if path not in self.page_table.keys():
@@ -168,3 +171,7 @@ class PageTable:
     def get_ranges_of_parts(self, path, part_no):
         part = self.get_part(path, part_no)
         return [part.start_byte, part.end_byte]
+
+    def if_eof(self, path, part_no):
+        part = self.get_part(path, part_no)
+        return part.get_eof()

@@ -3,6 +3,7 @@ from page_table import PageTable
 import ConfigParser
 import utility
 import os
+import sys
 
 
 def delete_file(filepath):
@@ -37,6 +38,7 @@ class ReadCache:
         self.logger.info("ReadCache: _get_data(): {0}".format(url))
         self.logger.info("ReadCache: _get_data(): Filename: " + filename + " Start: " + str(start) + " count: " + str(self.records_per_part))
         result = utility.get_data(url, filename, start=start, count=self.records_per_part)
+        print result
         # self.logger.info("ReadCache: _get_data(): Data returned is " + result)
         return result.encode('utf-8').strip()
 
@@ -49,6 +51,8 @@ class ReadCache:
         if abs_left.start_byte <= start_byte < abs_right.end_byte:
             start = True
         if abs_left.start_byte <= end_byte < abs_right.end_byte:
+            end = True
+        if end_byte > abs_right.end_byte and abs_right.get_eof() is True:
             end = True
         return start and end
 
@@ -70,7 +74,7 @@ class ReadCache:
 
         # keys of the page table
         keys = self.page_table.get_parts(path)
-        ranges = [self.page_table.get_ranges_of_parts(path, key) for key in keys]
+        ranges = [self.page_table.get_ranges_of_parts(path, key) for key in keys if self.page_table.if_eof(path, key) is False]
 
         # Since we are iterating through the ranges need to make sure that the ranges are sorted
         ranges = sorted(ranges, key=lambda x: x[0])
@@ -139,12 +143,19 @@ class ReadCache:
         self.logger.info("ReadCache: invalidate_extreme(): Cache file invalidated " + cache_file_path)
 
     def build_cache(self, path, start_count, part_no):
+        self.logger.info("ReadCache: build_cache(): Building Cache Start| Path:  " + path + " start_count: " + str(start_count) + " part_no: " + str(part_no))
         # Fetch 1000 pages and store it
         modified_path = path[1:].replace("/", "::")
         data = self._get_data(modified_path, start_count)
         # if there is no more data to be fetched return
         if len(data) == 0:
             self.logger.info("ReadCache: get_data(): EOF reached for file  " + path)
+            self.logger.info("ReadCache: get_data(): Creating a EOF entry for  " + path)
+            total_size = sum([self.page_table.get_part(path, part).get_end_byte() -
+                              self.page_table.get_part(path, part).get_start_byte()
+                              for part in self.page_table.get_parts(path)])
+            self.page_table.create_entry(path, start_count, start_count, total_size,
+                                         total_size, part_no=part_no, eof=True)
             return -1
         # generating part file name. Since this is the first file, the part number is assigned as 1
         part_path_file = self.aux_folder + path[1:] + "_" + str(part_no)
@@ -173,6 +184,7 @@ class ReadCache:
         self.page_table.update_entry(path, part_no)
 
     def get_data(self, path, start_byte, end_byte):
+        self.logger.info("ReadCache: get_data(): First Stop: " + str(start_byte) + " " + str(end_byte))
         # if end_byte - start_byte > self.page_table.get_cache_size(path):
         #     assert(False), "This functionality is not supported"
         # Check if this file has been fetched before
@@ -189,8 +201,12 @@ class ReadCache:
             parent_path = '/'.join(part_path_file.split('/')[:-1])
             if not os.path.exists(parent_path): os.makedirs(parent_path)
 
+            f = open(part_path_file, 'w')
+            f.write(data)
+            f.close()
+
+            print "If file " + part_path_file + " exists", os.path.isfile(part_path_file)
             self.logger.info("ReadCache: get_data(): File Created: " + part_path_file)
-            open(part_path_file, 'w').write(data)
             # Adding a page entry
             self.page_table.create_entry(path, 1, self.records_per_part, 0, os.stat(part_path_file).st_size, 0)
 
@@ -204,7 +220,7 @@ class ReadCache:
                 self.logger.info("ReadCache: get_data(): Getting other data: " + str(1 + 1 + count))
                 # if ret_val is -1 means the whole file has been fetched
                 if ret_val == -1 :
-                    self.logger.info("ReadCache: get_data(): EOF has been reached: " + str(to_fetch_part_no))
+                    self.logger.info("ReadCache: get_data(): EOF has been reached during initial fetch: " + str(to_fetch_part_no))
                     break
                 self.page_table.part_validate_page(path, to_fetch_part_no)
                 count += 1
@@ -385,7 +401,6 @@ def test4(read_cache):
     end_byte = 45103604
     length = 16384
     old = 0
-    ranges = list()
     right_ranges = list()
     # Ranges for Right Cache Sweep
     while old <= int(0.1 * end_byte):
@@ -400,10 +415,13 @@ def test4(read_cache):
     for start_byte, end_byte in ranges:
         # print "# " * 40
         # print "start_byte: " + str(start_byte) + " end_byte: " + str(end_byte)
-        t_start = time.time()
-        read_cache.get_data(path, start_byte, end_byte)
+        # t_start = time.time()
+        try:
+            read_cache.get_data(path, start_byte, end_byte)
+        except:
+            return False
 
-        print "start_byte: ", start_byte, " end_byte: ", end_byte, "Fetch Time: " + str(time.time() - t_start)
+        # print "start_byte: ", start_byte, " end_byte: ", end_byte, "Fetch Time: " + str(time.time() - t_start)
         # print "# " * 40
         # print "Extreme Left: ", read_cache.page_table.get_cache_left(path).start_byte, \
         #     " Extreme Right: ", read_cache.page_table.get_cache_right(path).end_byte
@@ -433,8 +451,9 @@ if __name__ == '__main__':
     port = "8010"
     read_cache = ReadCache(logger, ip, port)
 
-    test4(read_cache)
-    # tests = [test1(read_cache), test2(read_cache), test3(read_cache)]
-    # for i, test in enumerate(tests):
-    #     if test is not True: print "Test " + str(i+1) + " has failed"
-    #     else: print "Test " + str(i+1) + " has passed"
+
+    tests = [test1(read_cache), test2(read_cache), test3(read_cache), test4(read_cache)]
+    for i, test in enumerate(tests):
+        if test is not True: print "Test " + str(i+1) + " has failed"
+        else: print "Test " + str(i+1) + " has passed"
+        sys.stdout.flush()
