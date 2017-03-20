@@ -155,7 +155,7 @@ class Passthrough(Operations):
         logger.info("getattr: 2. URL requested : " + str(url))
         result = utility.get_result(url, modified_path)
         if _is_dir(result):
-            logger.debug("getattr: 2.1. It is a directory")
+            logger.info("getattr: 2.1. It is a directory")
             return_dict = {
                 'st_ctime': _get_ctimed(result),
                 'st_mtime': _get_ctimed(result),
@@ -170,6 +170,7 @@ class Passthrough(Operations):
         else:
             url = self._get_url() + "WsDfu/DFUInfo?ver_=1.31&wsdl"
             result = utility.get_result(url, modified_path)
+            logger.info("getattr: 2.1. It is a file" + str(_get_sizef(result)))
             return_dict = {
                 'st_ctime': _get_ctimef(result, modified_path),
                 'st_mtime': _get_ctimef(result, modified_path),

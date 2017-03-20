@@ -30,7 +30,8 @@ class cache():
     def get_entry(self, path, method):
         try:
             ret_val = self.cache[path][method]
-            self.logger.info('Cached: ' + str(path) + "|" + method)
+            self.logger.info('Cached: ' + str(path) + "|" + method )
+            print ret_val
             return ret_val
         except KeyError:
             return None

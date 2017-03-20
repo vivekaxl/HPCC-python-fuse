@@ -115,7 +115,8 @@ class ReadCache:
                 assert(len(data) == 0), "Something is wrong"
                 data += read_data(cache_file_path, offset, length)
 
-        self.logger.info("ReadCache: _fetch_data: Data has been fetched")
+        self.logger.info("ReadCache: _fetch_data: Data has been fetched | Path: " + path +
+                         " Start Byte: " + str(start_byte) + " End Byte: " + str(end_byte))
         return data
 
     def invalidate_all_parts(self, path):
