@@ -38,9 +38,8 @@ class ReadCache:
         self.logger.info("ReadCache: _get_data(): {0}".format(url))
         self.logger.info("ReadCache: _get_data(): Filename: " + filename + " Start: " + str(start) + " count: " + str(self.records_per_part))
         result = utility.get_data(url, filename, start=start, count=self.records_per_part)
-        print result
         # self.logger.info("ReadCache: _get_data(): Data returned is " + result)
-        return result.encode('utf-8').strip()
+        return result.encode('utf-8').strip() + "\n" if len(result) > 0 else result.encode('utf-8').strip()
 
     def if_cached(self, path, start_byte, end_byte):
         # keys of the page table
