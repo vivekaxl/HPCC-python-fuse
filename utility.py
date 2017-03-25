@@ -88,6 +88,6 @@ def get_data(url, scope, start=0, count=100):
         return lines
     except:
         import xmltodict, json
-        collector = "<dataset>" + "".join(result) + "</dataset>"
+        collector = "<dataset>" + "\n".join(result) + "</dataset>"
         o = xmltodict.parse(collector)
-    return json.dumps(o)
+    return json.dumps(o, indent=0)

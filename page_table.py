@@ -125,6 +125,11 @@ class PageTable:
     def get_page_table_right(self, path):
         return max(self.get_parts(path), lambda x: x.part_no)
 
+    def get_eof_entry(self, path):
+        parts = self.get_parts(path)
+        eof_entry = [self.page_table[path][part_no] for part_no in parts if self.page_table[path][part_no].get_eof() is True]
+        return eof_entry[-1] if len(eof_entry) != 0 else -1
+
     def get_cache_parts(self, path):
         """
         :param path: Path of the file

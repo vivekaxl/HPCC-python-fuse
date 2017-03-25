@@ -106,8 +106,10 @@ class Passthrough(Operations):
             return utility.unix_time(result['FileDetail']['Modified'])
 
         def _get_sizef(result):
-            if 'FileDetail' not in result.keys(): return
-            return int(result['FileDetail']['Filesize'].replace(',', ''))
+            return sys.maxint
+            # return -1
+            # if 'FileDetail' not in result.keys(): return
+            # return int(result['FileDetail']['Filesize'].replace(',', ''))
 
         def _get_nlinksf(result):
             return 1  # the n_links for a file is always 1
@@ -238,6 +240,9 @@ class Passthrough(Operations):
     def read(self, path, length, offset, fh):
         print "read: ", path, length, offset
         data = self.read_cache.get_data(path, offset, offset+length)
+        if data == 0:
+            print "EOF reached"
+            return 0
         return data
 
     # Read Only

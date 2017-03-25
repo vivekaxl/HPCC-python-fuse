@@ -242,6 +242,9 @@ class ReadCache:
             abs_right = self.page_table.get_cache_right(path)
             self.logger.info(
                 "ReadCache: get_data(): Cache Miss : Cache Start " + str(abs_left.start_byte) + "Cache End: " + str(abs_right.end_byte))
+            if self.page_table.get_eof_entry(path) != -1 and start_byte > self.page_table.get_eof_entry(path).get_start_byte() and end_byte > self.page_table.get_eof_entry(path).get_start_byte():
+                self.logger.info("ReadCache: get_data(): EOF File has been reached: " + str(start_byte) + " " + str(end_byte))
+                return 0
             # if start_byte and end_byte is both to the left or right of the cache - invalidate all the pages
             if (start_byte < abs_left.start_byte and end_byte < abs_left.start_byte) or \
                     (start_byte > abs_right.end_byte and end_byte > abs_right.end_byte):
@@ -305,7 +308,8 @@ class ReadCache:
             # To Left: if the start byte is to the left of cache and end_byte is within cache
             elif abs_left > start_byte and end_byte <= abs_right:
                 self.logger.info("ReadCache: get_data(): Data is to left of the cache window. Start Byte: "
-                                 + str(start_byte) + "End Byte: " + str(end_byte))
+                                 + str(start_byte) + "End Byte: " + str(end_byte) + " abs_left: " + str(abs_left)
+                                 + " abs_right: " + str(abs_right))
                 # if the entry for left part number does not exist
                 abs_left_part_no = abs_left.get_part_no()
                 to_fetch_part_no = abs_left_part_no - 1
@@ -345,6 +349,7 @@ class ReadCache:
         # Get data using the page table
         data = self._fetch_data(path, start_byte, end_byte)
         return data
+
 
 
 # for testing purposes
