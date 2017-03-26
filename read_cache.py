@@ -37,9 +37,13 @@ class ReadCache:
         url = self._get_url() + "WsWorkunits/WUResult.json?LogicalName="+ filename + "&Cluster=" + str(self.ip) + "&Start=" + str(start) + "&Count=" + str(self.records_per_part)
         self.logger.info("ReadCache: _get_data(): {0}".format(url))
         self.logger.info("ReadCache: _get_data(): Filename: " + filename + " Start: " + str(start) + " count: " + str(self.records_per_part))
-        result = utility.get_data(url)
+        result, total_count = utility.get_data(url)
         # self.logger.info("ReadCache: _get_data(): Data returned is " + result)
-        return result.encode('utf-8').strip() + "\n" if len(result) > 0 else result.encode('utf-8').strip()
+        ret_val = result.encode('utf-8').strip() + "\n" if len(result) > 0 else result.encode('utf-8').strip()
+        # if total_count <= start + self.records_per_part and len(result) > 0:
+        #     self.logger.info("ReadCache: _get_data(): Trailing character added")
+        #     ret_val += '\0' # This is a workaround so that application is able to recognize the EOF
+        return ret_val
 
     def if_cached(self, path, start_byte, end_byte):
         # keys of the page table
@@ -71,9 +75,16 @@ class ReadCache:
             f.close()
             return return_data
 
+        eof_char = ''
         # keys of the page table
         keys = self.page_table.get_parts(path)
         ranges = [self.page_table.get_ranges_of_parts(path, key) for key in keys if self.page_table.if_eof(path, key) is False]
+
+        eof = [self.page_table.get_ranges_of_parts(path, key) for key in keys if self.page_table.if_eof(path, key) is True]
+        if len(eof) > 0:
+            eof = eof[-1]
+            if end_byte > eof[0]:
+                eof_char = '\n'
 
         # Since we are iterating through the ranges need to make sure that the ranges are sorted
         ranges = sorted(ranges, key=lambda x: x[0])
@@ -117,7 +128,7 @@ class ReadCache:
 
         self.logger.info("ReadCache: _fetch_data: Data has been fetched | Path: " + path +
                          " Start Byte: " + str(start_byte) + " End Byte: " + str(end_byte))
-        return data
+        return data + eof_char
 
     def invalidate_all_parts(self, path):
         self.logger.info("ReadCache: invalidate_all_parts(): Invalidating all cached parts")
@@ -355,7 +366,8 @@ class ReadCache:
 # for testing purposes
 def test1(read_cache):
     """ Check if a new part can be instantiated"""
-    path = "/vivek/c2_f2_clustering.csv"
+    # path = "/vivek/c2_f2_clustering.csv"
+    path = "/vn/dsoutput"
     start_byte = 0
     end_byte = 16384
     data = read_cache.get_data(path, start_byte, end_byte)

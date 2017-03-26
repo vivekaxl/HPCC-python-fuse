@@ -73,10 +73,16 @@ def unix_time(time_string):
     #     return lines
 
 def get_data(url):
+    total_count = -1
     import urllib2
     url = url.replace(' ', '%20')
     # Download the content of the page
     response = urllib2.urlopen(url)
     html = response.read()
     data = html.split('\"Row\": ')[-1][1:-4].replace('\n','').replace('},', '}||')
-    return '\n'.join([d.strip() for d in data.split('||')])
+    try:
+        # This would only work for thor files
+        total_count = [int(l.strip().split(":")[-1].strip()) for l in html.split(',') if "Total" in l][-1]
+    except:
+        pass
+    return '\n'.join([d.strip() for d in data.split('||')]), total_count
