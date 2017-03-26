@@ -72,22 +72,11 @@ def unix_time(time_string):
     #     lines = '\n'.join(lines)
     #     return lines
 
-def get_data(url, scope, start=0, count=100):
-    def return_tag(line, tag="line"):
-        soup = BeautifulSoup(line, "html.parser")
-        return soup.line.string
-
-    client = Client(url)
-    response = client.service.DFUBrowseData(LogicalName=scope, Start=start, Count=count)
-    results = response.Result.split('\n')
-    # only get the lines which has the tag <Row>
-    result = [result for result in results if '<Row>' in result]
-    try:
-        # Get the data between line
-        lines = '\n'.join([return_tag(line) for line in result])
-        return lines
-    except:
-        import xmltodict, json
-        collector = "<dataset>" + "\n".join(result) + "</dataset>"
-        o = xmltodict.parse(collector)
-    return json.dumps(o, indent=0)
+def get_data(url):
+    import urllib2
+    url = url.replace(' ', '%20')
+    # Download the content of the page
+    response = urllib2.urlopen(url)
+    html = response.read()
+    data = html.split('\"Row\": ')[-1][1:-4].replace('\n','').replace('},', '}||')
+    return '\n'.join([d.strip() for d in data.split('||')])

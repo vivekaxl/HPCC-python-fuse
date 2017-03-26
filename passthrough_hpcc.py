@@ -14,7 +14,7 @@ from read_cache import ReadCache
 TEMP_DIR = "./.AUX/TEMP"
 
 # Adding logger
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 # create a file handler
@@ -106,7 +106,7 @@ class Passthrough(Operations):
             return utility.unix_time(result['FileDetail']['Modified'])
 
         def _get_sizef(result):
-            return sys.maxint
+            return 10**10
             # return -1
             # if 'FileDetail' not in result.keys(): return
             # return int(result['FileDetail']['Filesize'].replace(',', ''))

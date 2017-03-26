@@ -34,10 +34,10 @@ class ReadCache:
 
     def _get_data(self, filename, start):
         """ Getting data from a filename"""
-        url = self._get_url() + "WsDfu/DFUBrowseData?ver_=1.31&wsdl"
+        url = self._get_url() + "WsWorkunits/WUResult.json?LogicalName="+ filename + "&Cluster=" + str(self.ip) + "&Start=" + str(start) + "&Count=" + str(self.records_per_part)
         self.logger.info("ReadCache: _get_data(): {0}".format(url))
         self.logger.info("ReadCache: _get_data(): Filename: " + filename + " Start: " + str(start) + " count: " + str(self.records_per_part))
-        result = utility.get_data(url, filename, start=start, count=self.records_per_part)
+        result = utility.get_data(url)
         # self.logger.info("ReadCache: _get_data(): Data returned is " + result)
         return result.encode('utf-8').strip() + "\n" if len(result) > 0 else result.encode('utf-8').strip()
 
@@ -359,8 +359,10 @@ def test1(read_cache):
     start_byte = 0
     end_byte = 16384
     data = read_cache.get_data(path, start_byte, end_byte)
+    print data
     if len(data) > 0: return True
     else: return False
+
 
 def test2(read_cache):
     """ Check if a new part can be instantiated and can be accessed"""
@@ -457,7 +459,7 @@ if __name__ == '__main__':
     read_cache = ReadCache(logger, ip, port)
 
 
-    tests = [test1(read_cache), test2(read_cache), test3(read_cache), test4(read_cache)]
+    tests = [test1(read_cache)]#, test2(read_cache), test3(read_cache), test4(read_cache)]
     for i, test in enumerate(tests):
         if test is not True: print "Test " + str(i+1) + " has failed"
         else: print "Test " + str(i+1) + " has passed"
