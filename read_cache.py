@@ -5,12 +5,6 @@ import utility
 import os
 import sys
 
-
-def delete_file(filepath):
-    print "Delete File: ", filepath
-    os.unlink(filepath)
-
-
 class ReadCache:
     def __init__(self, logger, ip, port="8010"):
         self.ip = ip
@@ -20,7 +14,7 @@ class ReadCache:
         config = ConfigParser.ConfigParser()
         config.read("./config.ini")
         self.records_per_part = int(config.get('PageTable', 'records_per_part'))
-        self.parts_per_cache = int(config.get('PageTable', 'parts_per_cache'))
+        self.parts_per_cache = {}
         self.aux_folder = str(config.get('AUX', 'folder'))
         self.cache_size = float(config.get('PageTable', 'cache_size'))
 
@@ -132,13 +126,17 @@ class ReadCache:
         # print data
         return data + eof_char
 
+    def delete_file(self, filepath):
+        print "Delete File: ", filepath
+        open(filepath, 'w').write("")
+
     def invalidate_all_parts(self, path):
         self.logger.info("ReadCache: invalidate_all_parts(): Invalidating all cached parts")
         parts = self.page_table.get_cache_parts(path)
         for part in parts:
             self.logger.info("ReadCache: invalidate_all_parts(): Part invalidated: " + str(part.get_part_no()))
             cache_file_path = self.page_table.part_invalidate_page(path, part.get_part_no())
-            #delete_file(cache_file_path)
+            self.delete_file(cache_file_path)
         # raise RuntimeError('xxx')
 
     def invalidate_extreme(self, path, right=True):
@@ -154,7 +152,7 @@ class ReadCache:
         else:
             start_end_part = min(parts, key=lambda x: x.part_no)
         cache_file_path = self.page_table.part_invalidate_page(path, start_end_part.get_part_no())
-        delete_file(cache_file_path)
+        self.delete_file(cache_file_path)
         self.logger.info("ReadCache: invalidate_extreme(): Cache file invalidated " + cache_file_path)
 
     def build_cache(self, path, start_count, part_no):
@@ -198,6 +196,12 @@ class ReadCache:
         # Updating a page entry
         self.page_table.update_entry(path, part_no)
 
+    # def fill_page_table(self, path):
+    #     self.logger.info("ReadCache: fill_page_table(): Path: " + path)
+    #     if self.page_table.path_exists(path) is True:
+    #         assert(False, "This should not happen")
+    #     else:
+
     def get_data(self, path, start_byte, end_byte):
         self.logger.info("ReadCache: get_data(): First Stop: " + str(start_byte) + " " + str(end_byte))
         # if end_byte - start_byte > self.page_table.get_cache_size(path):
@@ -220,7 +224,6 @@ class ReadCache:
             f.write(data)
             f.close()
 
-            print "If file " + part_path_file + " exists", os.path.isfile(part_path_file)
             self.logger.info("ReadCache: get_data(): File Created: " + part_path_file)
             # Adding a page entry
             self.page_table.create_entry(path, 1, self.records_per_part, 0, os.stat(part_path_file).st_size, 0)
@@ -243,9 +246,9 @@ class ReadCache:
                           self.page_table.get_part(path, part).get_start_byte()
                           for part in self.page_table.get_parts(path)])/1024/1024
 
-            self.parts_per_cache = count
+            self.parts_per_cache[path] = count
             if ret_val != -1:
-                assert(len(self.page_table.get_cache_parts(path)) == self.parts_per_cache), "Initialization has failed"
+                assert(len(self.page_table.get_cache_parts(path)) == self.parts_per_cache[path]), "Initialization has failed"
 
         self.logger.info("Number of parts in cache: " + str(len(self.page_table.get_parts(path))))
         self.logger.info("Number of cached parts in cache: " + str(len(self.page_table.get_cache_parts(path))))
@@ -277,10 +280,9 @@ class ReadCache:
                     assert(False), "This functionality is not supported"
 
                 # invalidate all parts
-                print ">>> " * 100
-                dummy = self.invalidate_all_parts(path)
+                self.invalidate_all_parts(path)
                 self.logger.info("ReadCache: get_data(): New parts")
-                print parts
+
                 # validate the parts, which has been previously fetched
                 for part in parts:
                     self.logger.info("ReadCache: get_data(): Update the parts which belong the start and end byte "
@@ -289,30 +291,32 @@ class ReadCache:
                     self.page_table.part_validate_page(path, part.get_part_no())
 
                 # check if the new parts are equal to self.parts_per_cache
-                if len(parts) < self.parts_per_cache:
+                if len(parts) < self.parts_per_cache[path]:
                     self.logger.info("ReadCache: get_data(): Fill up all the cache parts - self.parts_per_cache ")
                     # fetch part numbers
                     part_numbers = [part.get_part_no() for part in parts]
+
                     # Add new parts which should be added to the cache
                     fetch_part_numbers = []
-                    while len(part_numbers) + len(fetch_part_numbers) == self.parts_per_cache:
+                    while len(part_numbers) + len(fetch_part_numbers) != self.parts_per_cache[path]:
                         if len(fetch_part_numbers) == 0:
                             fetch_part_numbers.append(max(part_numbers)+1)
                         else:
                             fetch_part_numbers.append(max(fetch_part_numbers) + 1)
 
                     # parts, which has been fetched before
-                    old_parts = [fetch_part for fetch_part in fetch_part_numbers if self.page_table.if_accessed_before(fetch_part) is True]
+                    old_parts = [fetch_part for fetch_part in fetch_part_numbers if self.page_table.if_accessed_before(path, fetch_part) is True]
+                    self.logger.info("ReadCache: get_data(): Number of parts that has been fetched before is {0}".format(str(len(old_parts))))
 
                     # parts, which have never been fetched before
-                    new_parts = [fetch_part for fetch_part in fetch_part_numbers if self.page_table.if_accessed_before(fetch_part) is False]
+                    new_parts = [fetch_part for fetch_part in fetch_part_numbers if self.page_table.if_accessed_before(path, fetch_part) is False]
                     self.logger.info("ReadCache: get_data(): Parts which have never been fetched before: {0}".format(','.join(map(str, new_parts))))
 
                     # Update the cache file - i.e. download the latest cache
                     self.logger.info("ReadCache: get_data(): Download latest cache for older parts")
                     for old_part in old_parts:
-                        self.update_cache_file(path, old_part.get_part_no())
-                        self.page_table.part_validate_page(path, part.get_part_no())
+                        self.update_cache_file(path, old_part)
+                        self.page_table.part_validate_page(path, old_part)
 
                     # Build parts for new parts and download the latest cache
                     self.logger.info("ReadCache: get_data(): Fetch data and update cache for newer parts")
