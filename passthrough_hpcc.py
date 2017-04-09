@@ -9,6 +9,7 @@ import os
 from fuse import FUSE,  Operations
 from cache import cache
 from read_cache import ReadCache
+import ConfigParser
 
 # Temporary Directory to store the files. This to help in reading
 TEMP_DIR = "./.AUX/TEMP"
@@ -36,6 +37,9 @@ class Passthrough(Operations):
         self._cleanup()
         self.cache = cache(ip, logger)
         self.read_cache = ReadCache(logger, ip, port)
+        config = ConfigParser.ConfigParser()
+        config.read("./config.ini")
+        self.exact_filesize = True if config.get('AUX', 'extact_filesize') == "True" else False
 
     # Helpers
     # =======
@@ -108,6 +112,7 @@ class Passthrough(Operations):
 
         def _get_sizef(result):
             return 10**10
+            # TODO return correct filesize
             # return -1
             # if 'FileDetail' not in result.keys(): return
             # return int(result['FileDetail']['Filesize'].replace(',', ''))
@@ -235,6 +240,16 @@ class Passthrough(Operations):
     # Read Only
     def open(self, path, flags):
         # return a dummy because path is passed in during read
+        if self.exact_filesize is True:
+            print self.exact_filesize
+            raise Exception('This is the exception you expect to handle')
+            logger.info("open: Exact File size to be fetched for  : " + path)
+            existing_dict = self.cache.get_entry(path, 'getattr')
+            file_size = self.read_cache.get_file_size(path)
+            logger.info("open: Exact File size: " + str(file_size))
+            # Modifying the file size
+            existing_dict['st_size'] = file_size
+            self.cache.set_entry(path, 'getattr', existing_dict)
         return -1
 
     # Read Only

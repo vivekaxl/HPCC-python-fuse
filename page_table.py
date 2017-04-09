@@ -65,7 +65,7 @@ class PageTable:
             self.logger.info('PageTable: delete_entry(): The entry already exists. Something is wrong')
         else:
             # updating only the cache file path.
-            cache_file_path = self.aux_folder + path + "_" + str(part_no)
+            cache_file_path = self.aux_folder + path[1:] + "_" + str(part_no)
             self.page_table[path][part_no].set_cache_file_path(cache_file_path)
 
     def path_exists(self, path):
@@ -89,8 +89,7 @@ class PageTable:
         assert (part.if_cached is True), "Something is wrong"
         part.invalidate_cache()
         assert (self.get_part(path, part_no).if_cached is False), "Something is wrong"
-
-        part.invalidate_cache()
+        print ">> ", path, part.get_cache_file_path()
         return part.get_cache_file_path()
 
     def part_validate_page(self, path, part_no):
@@ -120,10 +119,12 @@ class PageTable:
         return max(all_start_positions, key=lambda x: x.part_no)
 
     def get_page_table_left(self, path):
-        return min(self.get_parts(path), lambda x: x.part_no)
+        part_no = min(self.get_parts(path))
+        return self.get_part(path, part_no)
 
     def get_page_table_right(self, path):
-        return max(self.get_parts(path), lambda x: x.part_no)
+        part_no = max(self.get_parts(path))
+        return self.get_part(path, part_no)
 
     def get_eof_entry(self, path):
         parts = self.get_parts(path)
