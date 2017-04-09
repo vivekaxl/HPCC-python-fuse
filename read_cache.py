@@ -7,7 +7,8 @@ import sys
 
 
 def delete_file(filepath):
-    os.remove(filepath)
+    print "Delete File: ", filepath
+    os.unlink(filepath)
 
 
 class ReadCache:
@@ -128,14 +129,17 @@ class ReadCache:
 
         self.logger.info("ReadCache: _fetch_data: Data has been fetched | Path: " + path +
                          " Start Byte: " + str(start_byte) + " End Byte: " + str(end_byte))
+        # print data
         return data + eof_char
 
     def invalidate_all_parts(self, path):
         self.logger.info("ReadCache: invalidate_all_parts(): Invalidating all cached parts")
         parts = self.page_table.get_cache_parts(path)
         for part in parts:
+            self.logger.info("ReadCache: invalidate_all_parts(): Part invalidated: " + str(part.get_part_no()))
             cache_file_path = self.page_table.part_invalidate_page(path, part.get_part_no())
-            delete_file(cache_file_path)
+            #delete_file(cache_file_path)
+        # raise RuntimeError('xxx')
 
     def invalidate_extreme(self, path, right=True):
         """ To move cache to the left - This invalidates the extreme part"""
@@ -243,6 +247,8 @@ class ReadCache:
             if ret_val != -1:
                 assert(len(self.page_table.get_cache_parts(path)) == self.parts_per_cache), "Initialization has failed"
 
+        self.logger.info("Number of parts in cache: " + str(len(self.page_table.get_parts(path))))
+        self.logger.info("Number of cached parts in cache: " + str(len(self.page_table.get_cache_parts(path))))
         # Check if the data exists in the local repository
         while self.if_cached(path, start_byte, end_byte) is not True:
             self.logger.info("ReadCache: get_data(): Cache Miss : Start Byte " + str(start_byte) + "End Byte: " + str(end_byte))
@@ -263,6 +269,7 @@ class ReadCache:
                 #TODO if the parts have not been fetched in the past then we need to try and iteratively build the cache
                 # fetch all the parts have the data
                 parts = self.page_table.get_parts_based_byte_position(path, start_byte, end_byte)
+
                 if parts == -1: # these parts have never been fetched before
                     self.logger.info("ReadCache: get_data(): These parts have never been fetched before. "
                                      "Hence, Random Access")
@@ -270,8 +277,10 @@ class ReadCache:
                     assert(False), "This functionality is not supported"
 
                 # invalidate all parts
-                self.invalidate_all_parts(path)
-
+                print ">>> " * 100
+                dummy = self.invalidate_all_parts(path)
+                self.logger.info("ReadCache: get_data(): New parts")
+                print parts
                 # validate the parts, which has been previously fetched
                 for part in parts:
                     self.logger.info("ReadCache: get_data(): Update the parts which belong the start and end byte "
