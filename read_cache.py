@@ -17,6 +17,7 @@ class ReadCache:
         self.parts_per_cache = {}
         self.aux_folder = str(config.get('AUX', 'folder'))
         self.cache_size = float(config.get('PageTable', 'cache_size'))
+        self.exact_filesize = True if config.get('AUX', 'extact_filesize') == "True" else False
 
     def _get_url(self):
         if self.ip != "":
@@ -34,10 +35,7 @@ class ReadCache:
         self.logger.info("ReadCache: _get_data(): Filename: " + filename + " Start: " + str(start) + " count: " + str(self.records_per_part))
         result, total_count = utility.get_data(url)
         # self.logger.info("ReadCache: _get_data(): Data returned is " + result)
-        ret_val = result.encode('utf-8').strip() + "\n" if len(result) > 0 else result.encode('utf-8').strip()
-        # if total_count <= start + self.records_per_part and len(result) > 0:
-        #     self.logger.info("ReadCache: _get_data(): Trailing character added")
-        #     ret_val += '\0' # This is a workaround so that application is able to recognize the EOF
+        ret_val = result.encode('utf-8').strip()
         return ret_val
 
     def if_cached(self, path, start_byte, end_byte):
@@ -63,6 +61,7 @@ class ReadCache:
         :return:
         """
         def read_data(path, offset, length):
+            self.logger.info("ReadCache: _fetch_data: Read Data" + path + ", " + str(offset) + ", " + str(length))
             f = open(path, 'r')
             assert(offset > -1), "Something is wrong"
             f.seek(offset)
@@ -70,16 +69,11 @@ class ReadCache:
             f.close()
             return return_data
 
-        eof_char = ''
         # keys of the page table
         keys = self.page_table.get_parts(path)
         ranges = [self.page_table.get_ranges_of_parts(path, key) for key in keys if self.page_table.if_eof(path, key) is False]
 
         eof = [self.page_table.get_ranges_of_parts(path, key) for key in keys if self.page_table.if_eof(path, key) is True]
-        if len(eof) > 0:
-            eof = eof[-1]
-            if end_byte > eof[0]:
-                eof_char = '\n'
 
         # Since we are iterating through the ranges need to make sure that the ranges are sorted
         ranges = sorted(ranges, key=lambda x: x[0])
@@ -124,7 +118,7 @@ class ReadCache:
         self.logger.info("ReadCache: _fetch_data: Data has been fetched | Path: " + path +
                          " Start Byte: " + str(start_byte) + " End Byte: " + str(end_byte))
         # print data
-        return data + eof_char
+        return data
 
     def delete_file(self, filepath):
         print "Delete File: ", filepath
@@ -142,9 +136,9 @@ class ReadCache:
     def invalidate_extreme(self, path, right=True):
         """ To move cache to the left - This invalidates the extreme part"""
         if right is True:
-            self.logger.info("ReadCache: invalidate_extreme(): Invalidate Right Extreme")
+            self.logger.info("ReadCache: invalidate_extreme(): Invalidate Right Extreme" + path)
         else:
-            self.logger.info("ReadCache: invalidate_extreme(): Invalidate Left Extreme")
+            self.logger.info("ReadCache: invalidate_extreme(): Invalidate Left Extreme" + path)
 
         parts = self.page_table.get_cache_parts(path)
         if right is True:
@@ -155,8 +149,11 @@ class ReadCache:
         self.delete_file(cache_file_path)
         self.logger.info("ReadCache: invalidate_extreme(): Cache file invalidated " + cache_file_path)
 
-    def build_cache(self, path, start_count, part_no):
+    def build_cache(self, path, start_count, part_no, initial=False, tail_part=False):
         self.logger.info("ReadCache: build_cache(): Building Cache Start| Path:  " + path + " start_count: " + str(start_count) + " part_no: " + str(part_no))
+        if tail_part is True and self.exact_filesize is True:
+            self.logger.info("ReadCache: Tail part exist. So skip")
+            return -1
         # Fetch 1000 pages and store it
         modified_path = path[1:].replace("/", "::")
         data = self._get_data(modified_path, start_count)
@@ -173,14 +170,19 @@ class ReadCache:
         # generating part file name. Since this is the first file, the part number is assigned as 1
         part_path_file = self.aux_folder + path[1:] + "_" + str(part_no)
         self.logger.info("ReadCache: get_data(): File Created: " + part_path_file)
-        open(part_path_file, 'w').write(data)
 
-        total_size = sum([self.page_table.get_part(path, part).get_end_byte() -
-                          self.page_table.get_part(path, part).get_start_byte()
-                          for part in self.page_table.get_parts(path)])
-        # Adding a page entry
-        self.page_table.create_entry(path, start_count, start_count + self.records_per_part, total_size,
-                                     total_size + os.stat(part_path_file).st_size, part_no=part_no)
+        ftest = open(part_path_file, 'w')
+        ftest.write(data)
+        ftest.close()
+        if initial is True:
+            self.page_table.create_entry(path, 1, self.records_per_part, 0, os.stat(part_path_file).st_size, 0)
+        else:
+            total_size = sum([self.page_table.get_part(path, part).get_end_byte() -
+                              self.page_table.get_part(path, part).get_start_byte()
+                              for part in self.page_table.get_parts(path)])
+            # Adding a page entry
+            self.page_table.create_entry(path, start_count, start_count + self.records_per_part, total_size,
+                                         total_size + os.stat(part_path_file).st_size, part_no=part_no)
 
     def update_cache_file(self, path, part_no):
         part = self.page_table.get_part(path, part_no)
@@ -196,62 +198,107 @@ class ReadCache:
         # Updating a page entry
         self.page_table.update_entry(path, part_no)
 
-    # def fill_page_table(self, path):
-    #     self.logger.info("ReadCache: fill_page_table(): Path: " + path)
-    #     if self.page_table.path_exists(path) is True:
-    #         assert(False, "This should not happen")
-    #     else:
-
-    def get_data(self, path, start_byte, end_byte):
-        self.logger.info("ReadCache: get_data(): First Stop: " + str(start_byte) + " " + str(end_byte))
-        # if end_byte - start_byte > self.page_table.get_cache_size(path):
-        #     assert(False), "This functionality is not supported"
-        # Check if this file has been fetched before
+    def get_file_size(self, path):
+        self.logger.info("get_file_size: Path: " + path)
         if self.page_table.path_exists(path) is False:
-            # assert(start_byte == -1 and end_byte == -1), "This should only happen when the file is opened"
-            # Instantiate first part
-            # Fetch 1000 pages and store it
-            modified_path = path[1:].replace("/", "::")
+            # The path does not exist. Parse through the whole file
+            self.fill_page_table(path)
+        # else the file must have been fetched when the file was first opened
+        # Get the tail part
+        tail = self.page_table.get_page_table_right(path)
+        assert(tail.get_eof() is True), "Something is wrong"
+        ret_val = tail.get_end_byte()
+        self.logger.info("get_file_size: File Size is: : " + str(ret_val))
+        return ret_val
 
-            data = self._get_data(modified_path, 0)
-
+    def fill_page_table(self, path):
+        self.logger.info("ReadCache: fill_page_table(): Path: " + path)
+        ret_val = 0
+        start_record = 0
+        fetch_part_no = 0
+        while ret_val != -1:
             # generating part file name. Since this is the first file, the part number is assigned as 1
             part_path_file = self.aux_folder + path[1:] + "_" + str(0)
             parent_path = '/'.join(part_path_file.split('/')[:-1])
             if not os.path.exists(parent_path): os.makedirs(parent_path)
 
-            f = open(part_path_file, 'w')
-            f.write(data)
-            f.close()
+            if fetch_part_no == 0:
+                ret_val = self.build_cache(path, start_record, fetch_part_no, initial=True)
+            else:
+                ret_val = self.build_cache(path, start_record, fetch_part_no)
+            cache_file_path = self.page_table.part_invalidate_page(path, fetch_part_no)
+            self.delete_file(cache_file_path)
+            self.logger.info("fill_page_table(): Invalidate the fetched page " + cache_file_path)
+            start_record += self.records_per_part
+            fetch_part_no += 1
 
-            self.logger.info("ReadCache: get_data(): File Created: " + part_path_file)
-            # Adding a page entry
-            self.page_table.create_entry(path, 1, self.records_per_part, 0, os.stat(part_path_file).st_size, 0)
+        # Find parts per cache
+        parts = self.page_table.get_parts(path)
+        total_size = 0
+        count = 0
+        for part_no in parts:
+            count += 1
+            part = self.page_table.get_part(path, part_no)
+            total_size += (part.get_end_byte() - part.get_start_byte())
+            if total_size > self.cache_size:
+                self.parts_per_cache[path] = count
+                break
 
-            count = 1
-            total_size = 0
-            while total_size < self.cache_size: # since the first part has been fetched
-                abs_right = self.page_table.get_cache_right(path)
-                abs_right_part_no = abs_right.get_part_no()
-                to_fetch_part_no = abs_right_part_no + 1
-                ret_val = self.build_cache(path, abs_right.end_record, to_fetch_part_no)
-                self.logger.info("ReadCache: get_data(): Getting other data: " + str(1 + 1 + count))
-                # if ret_val is -1 means the whole file has been fetched
-                if ret_val == -1 :
-                    self.logger.info("ReadCache: get_data(): EOF has been reached during initial fetch: " + str(to_fetch_part_no))
-                    break
-                self.page_table.part_validate_page(path, to_fetch_part_no)
-                count += 1
-                total_size = sum([self.page_table.get_part(path, part).get_end_byte() -
-                          self.page_table.get_part(path, part).get_start_byte()
-                          for part in self.page_table.get_parts(path)])/1024/1024
+        self.logger.info("fill_page_table(): Number of entries created is " + str(len(self.page_table.get_parts(path))))
 
-            self.parts_per_cache[path] = count
-            if ret_val != -1:
-                assert(len(self.page_table.get_cache_parts(path)) == self.parts_per_cache[path]), "Initialization has failed"
+    def build_initial_cache(self, path):
+        self.logger.info("ReadCache: build_initial_cache(): Path: " + path)
+        ret_val = 0
+        start_record = 0
+        fetch_part_no = 0
+        count = 0
+        total_size = 0
+        while total_size < self.cache_size:
+            # generating part file name. Since this is the first file, the part number is assigned as 1
+            part_path_file = self.aux_folder + path[1:] + "_" + str(0)
+            parent_path = '/'.join(part_path_file.split('/')[:-1])
+            if not os.path.exists(parent_path): os.makedirs(parent_path)
+
+            if fetch_part_no == 0:
+                ret_val = self.build_cache(path, start_record, fetch_part_no, initial=True)
+            else:
+                ret_val = self.build_cache(path, start_record, fetch_part_no)
+            if ret_val == -1:
+                self.logger.info(
+                    "ReadCache: get_data(): EOF has been reached during initial fetch: " + str(fetch_part_no))
+                break
+            self.page_table.part_validate_page(path, fetch_part_no)
+            count += 1
+            start_record += self.records_per_part
+            fetch_part_no += 1
+            total_size = sum([self.page_table.get_part(path, part).get_end_byte() -
+                              self.page_table.get_part(path, part).get_start_byte()
+                              for part in self.page_table.get_parts(path)]) / 1024 / 1024
+
+        self.parts_per_cache[path] = count
+        if ret_val != -1:
+            assert(len(self.page_table.get_cache_parts(path)) == self.parts_per_cache[path]), "Initialization has failed"
+
+    def get_data(self, path, start_byte, end_byte):
+        self.logger.info("ReadCache: get_data(): " + path + " First Stop: " + str(start_byte) + " " + str(end_byte))
+        # if end_byte - start_byte > self.page_table.get_cache_size(path):
+        #     assert(False), "This functionality is not supported"
+        # Check if this file has been fetched before
+        if self.page_table.path_exists(path) is False:
+            self.build_initial_cache(path)
+        elif len(self.page_table.get_cache_parts(path)) == 0:
+            self.logger.info("ReadCache: get_data(): Updating Cache Files No. of parts/cache:  " + str(self.parts_per_cache[path]))
+            for part_no in xrange(self.parts_per_cache[path]):
+                self.logger.info("ReadCache: get_data(): Updating Cache Files for part no.: " + str(part_no))
+                self.update_cache_file(path, part_no)
+                self.page_table.part_validate_page(path, part_no)
 
         self.logger.info("Number of parts in cache: " + str(len(self.page_table.get_parts(path))))
         self.logger.info("Number of cached parts in cache: " + str(len(self.page_table.get_cache_parts(path))))
+
+        temp_file_right = self.page_table.get_page_table_right(path)
+        tail_part = True if temp_file_right.get_eof() is True else False
+
         # Check if the data exists in the local repository
         while self.if_cached(path, start_byte, end_byte) is not True:
             self.logger.info("ReadCache: get_data(): Cache Miss : Start Byte " + str(start_byte) + "End Byte: " + str(end_byte))
@@ -260,6 +307,8 @@ class ReadCache:
             abs_left = self.page_table.get_cache_left(path)
             # Get absolute right
             abs_right = self.page_table.get_cache_right(path)
+            # Get file right : EOF entry
+
             self.logger.info(
                 "ReadCache: get_data(): Cache Miss : Cache Start " + str(abs_left.start_byte) + "Cache End: " + str(abs_right.end_byte))
             if self.page_table.get_eof_entry(path) != -1 and start_byte > self.page_table.get_eof_entry(path).get_start_byte() and end_byte > self.page_table.get_eof_entry(path).get_start_byte():
@@ -348,32 +397,31 @@ class ReadCache:
                     self.update_cache_file(path, part.get_part_no())
                     self.page_table.part_validate_page(path, part)
 
-            # To Right
             elif abs_left <= start_byte and end_byte > abs_right:
                 self.logger.info("ReadCache: get_data(): Data is to right of the cache window. Start Byte: "
                                  + str(start_byte) + "End Byte: " + str(end_byte))
-                self.invalidate_extreme(path, right=False)
+                ret_val = 0
                 # if the entry for left part number does not exist
                 abs_right_part_no = abs_right.get_part_no()
                 to_fetch_part_no = abs_right_part_no + 1
                 all_part_no = [self.page_table.get_part(path, part_no).get_part_no() for part_no in self.page_table.get_parts(path)]
                 if to_fetch_part_no not in all_part_no:
                     self.logger.info("ReadCache: get_data(): Part has not been fetched before hence move to right")
-                    ret_val = self.build_cache(path, abs_right.end_record, to_fetch_part_no)
+                    ret_val = self.build_cache(path, abs_right.end_record, to_fetch_part_no, tail_part=tail_part)
                     if ret_val == -1:
                         self.logger.info("ReadCache: get_data(): EOF has been reached: " + str(to_fetch_part_no))
                         break
                     part = self.page_table.get_part(path, to_fetch_part_no)
                 else:
                     part = self.page_table.get_part(path, to_fetch_part_no)
+                    if part.get_eof() is True: ret_val = -1
                     self.update_cache_file(path, part.get_part_no())
-
+                if ret_val != -1: self.invalidate_extreme(path, right=False)
                 self.page_table.part_validate_page(path, part.get_part_no())
 
         # Get data using the page table
         data = self._fetch_data(path, start_byte, end_byte)
         return data
-
 
 
 # for testing purposes
