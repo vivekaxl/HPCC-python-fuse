@@ -15,7 +15,7 @@ class ReadCache:
         config = ConfigParser.ConfigParser()
         config.read("./config.ini")
         self.initial_fetch = int(config.get('PageTable', 'initial_fetch'))
-        self.parts_per_cache = float(config.get('PageTable', 'parts_per_cache'))
+        self.parts_per_cache = int(config.get('PageTable', 'parts_per_cache'))
         self.records_per_part = {}
         self.aux_folder = str(config.get('AUX', 'folder'))
         self.cache_size = float(config.get('PageTable', 'cache_size'))
@@ -123,8 +123,9 @@ class ReadCache:
         return data
 
     def delete_file(self, filepath):
-        print "Delete File: ", filepath
-        open(filepath, 'w').write("")
+        print ">> " * 100, " Delete File: ", filepath
+        # open(filepath, 'w').write("")
+        os.remove(filepath)
 
     def invalidate_all_parts(self, path):
         self.logger.info("ReadCache: invalidate_all_parts(): Invalidating all cached parts")
@@ -191,7 +192,7 @@ class ReadCache:
         start_count = part.get_start_record()
         # Fetch 1000 pages and store it
         modified_path = path[1:].replace("/", "::")
-        data = self._get_data(modified_path, start_count)
+        data = self._get_data(modified_path, start_count, self.records_per_part[path])
         # generating part file name. Since this is the first file, the part number is assigned as 1
         part_path_file = self.aux_folder + path[1:] + "_" + str(part_no)
         self.logger.info("ReadCache: get_data(): File Created: " + part_path_file)
@@ -266,6 +267,7 @@ class ReadCache:
         temp_record_size = temp_file_size/self.initial_fetch
         number_of_record_in_cache = int(self.cache_size * 1024 * 1024 / temp_record_size)
         self.records_per_part[path] = int(number_of_record_in_cache/5)
+        os.remove(temp_filename)
 
         # Build Cache
         ret_val = 0
@@ -422,7 +424,7 @@ class ReadCache:
                 all_part_no = [self.page_table.get_part(path, part_no).get_part_no() for part_no in self.page_table.get_parts(path)]
                 if to_fetch_part_no not in all_part_no:
                     self.logger.info("ReadCache: get_data(): Part has not been fetched before hence move to right")
-                    ret_val = self.build_cache(path, abs_right.end_record, to_fetch_part_no, tail_part=tail_part)
+                    ret_val = self.build_cache(path, abs_right.end_record, to_fetch_part_no, self.records_per_part[path], tail_part=tail_part)
                     if ret_val == -1:
                         self.logger.info("ReadCache: get_data(): EOF has been reached: " + str(to_fetch_part_no))
                         break
