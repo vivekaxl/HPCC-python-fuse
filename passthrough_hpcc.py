@@ -32,17 +32,60 @@ logger.addHandler(handler)
 
 class Passthrough(Operations):
     def __init__(self, ip, port="8010"):
+        config = ConfigParser.ConfigParser()
+        config.read("./config.ini")
+        self._config_check(config)
         self.ip = ip
         self.port = port
         self._cleanup()
         self.cache = cache(ip, logger)
         self.read_cache = ReadCache(logger, ip, port)
-        config = ConfigParser.ConfigParser()
-        config.read("./config.ini")
         self.exact_filesize = True if config.get('AUX', 'extact_filesize') == "True" else False
 
     # Helpers
     # =======
+    def _config_check(self, config):
+        def represent_int(number):
+            try:
+                int(number)
+                return True
+            except:
+                return False
+
+        aux_folder = config.get('AUX', 'folder')
+        # Check if the folder exists if not throw error
+        if os.path.isdir(aux_folder) is False:
+            raise ValueError('folder does not exist -- check config.ini')
+
+        exact_filesize = config.get('AUX', 'extact_filesize')
+        print exact_filesize
+        if exact_filesize == "True" or exact_filesize  == "False": pass
+        else:
+            raise ValueError('Exact Filesize should be either True or False -- check config.ini')
+
+        initial_fetch = config.get('PageTable', 'initial_fetch')
+        if initial_fetch.lstrip('-+').isdigit() is False:
+            raise ValueError('initial_fetch should be a number -- check config.ini')
+        if represent_int(initial_fetch) is False:
+            raise ValueError('initial_fetch should be an integer -- check config.ini')
+        if int(initial_fetch) < 10:
+            raise ValueError('initial_fetch should greater than 10 -- check config.ini')
+
+        parts_per_cache = config.get('PageTable', 'parts_per_cache')
+        if parts_per_cache.lstrip('-+').isdigit() is False:
+            raise ValueError('parts_per_cache Number should be a number -- check config.ini')
+        if represent_int(parts_per_cache) is False:
+            raise ValueError('parts_per_cache should be an integer -- check config.ini')
+        if int(parts_per_cache) < 2:
+            raise ValueError('parts_per_cache should greater than 2 -- check config.ini')
+
+        cache_size = config.get('PageTable', 'cache_size')
+        if cache_size.lstrip('-+').isdigit() is False:
+            raise ValueError('cache_size Number should be a posivite number -- check config.ini')
+        if float(cache_size) < 0:
+            raise ValueError('cache_size should be positive -- check config.ini')
+
+
     def _cleanup(self):
         """Cleaning up the files stored from the last session"""
         # TODO: Need to add functionality so that the files are deleted at SIGINT
