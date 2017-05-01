@@ -322,7 +322,6 @@ def main(mountpoint, ip="10.239.227.6", port="8010"):
     FUSE(Passthrough(ip, port), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
-    # Usage: python passthrough_hpcc.py ip mountpoint
     # try:
         main(sys.argv[3], sys.argv[1], sys.argv[2])
     # except:
