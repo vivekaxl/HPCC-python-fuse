@@ -2,6 +2,7 @@ from suds.client import Client
 from suds.sudsobject import asdict
 from datetime import datetime
 from dateutil import parser
+from suds import MethodNotFound
 from bs4 import BeautifulSoup
 
 
@@ -22,12 +23,15 @@ def recursive_translation(d):
     return result
 
 
-def get_result(url, scope):
+def get_result(url, scope, logging):
     client = Client(url)
     try:
-        response = client.service.DFUFileView(Scope=scope)
-    except:
-        response = client.service.DFUInfo(Name=scope)
+        try:
+            response = client.service.DFUFileView(Scope=scope)
+        except:
+            response = client.service.DFUInfo(Name=scope)
+    except MethodNotFound:
+        logging.error('Utility.get_result: Connection Lost')
     dict = recursive_translation(response)
     return dict
 

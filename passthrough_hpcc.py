@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # create a file handler
 handler = logging.FileHandler('HISTORY.log')
-handler.setLevel(logging.INFO)
+handler.setLevel(logging.ERROR)
 
 # create a logging format
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -55,33 +55,43 @@ class Passthrough(Operations):
         aux_folder = config.get('AUX', 'folder')
         # Check if the folder exists if not throw error
         if os.path.isdir(aux_folder) is False:
+            logger.error("_config_check: Auxillary File does not exist")
             raise ValueError('folder does not exist -- check config.ini')
 
         exact_filesize = config.get('AUX', 'extact_filesize')
         if exact_filesize == "True" or exact_filesize  == "False": pass
         else:
+            logger.error("_config_check: extact_filesize should either be True or False. Value passed: " + exact_filesize)
             raise ValueError('Exact Filesize should be either True or False -- check config.ini')
 
         initial_fetch = config.get('PageTable', 'initial_fetch')
         if initial_fetch.lstrip('-+').isdigit() is False:
+            logger.error("_config_check: initial_fetch should be a number. Value passed: " + initial_fetch)
             raise ValueError('initial_fetch should be a number -- check config.ini')
         if represent_int(initial_fetch) is False:
+            logger.error("_config_check: initial_fetch should be a integer. Value passed: " + initial_fetch)
             raise ValueError('initial_fetch should be an integer -- check config.ini')
         if int(initial_fetch) < 10:
+            logger.error("_config_check: initial_fetch should be greater than 10: " + initial_fetch)
             raise ValueError('initial_fetch should greater than 10 -- check config.ini')
 
         parts_per_cache = config.get('PageTable', 'parts_per_cache')
         if parts_per_cache.lstrip('-+').isdigit() is False:
+            logger.error("_config_check: parts_per_cache should be a number. Value passed: " + parts_per_cache)
             raise ValueError('parts_per_cache Number should be a number -- check config.ini')
         if represent_int(parts_per_cache) is False:
+            logger.error("_config_check: parts_per_cache should be an integer. Value passed: " + parts_per_cache)
             raise ValueError('parts_per_cache should be an integer -- check config.ini')
         if int(parts_per_cache) < 2:
+            logger.error("_config_check: parts_per_cache should be greater than 2. Value passed: " + parts_per_cache)
             raise ValueError('parts_per_cache should greater than 2 -- check config.ini')
 
         cache_size = config.get('PageTable', 'cache_size')
         if cache_size.lstrip('-+').isdigit() is False:
+            logger.error("_config_check: cache_size should be a number. Value passed: " + cache_size)
             raise ValueError('cache_size Number should be a posivite number -- check config.ini')
         if float(cache_size) < 0:
+            logger.error("_config_check: cache_size should be a positive number. Value passed: " + cache_size)
             raise ValueError('cache_size should be positive -- check config.ini')
 
 
@@ -111,7 +121,7 @@ class Passthrough(Operations):
         else:
             modified_path = ""
         url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
-        result = utility.get_result(url, modified_path)
+        result = utility.get_result(url, modified_path, logger)
 
         if 'DFULogicalFiles' in result.keys():
             logger.info("_is_file: True, Pathname: " + pathname)
@@ -203,7 +213,7 @@ class Passthrough(Operations):
         logger.info("getattr: 1. %s", str(modified_path))
         url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
         logger.info("getattr: 2. URL requested : " + str(url))
-        result = utility.get_result(url, modified_path)
+        result = utility.get_result(url, modified_path, logger)
         if _is_dir(result):
             logger.info("getattr: 2.1. It is a directory")
             return_dict = {
@@ -219,7 +229,7 @@ class Passthrough(Operations):
             }
         else:
             url = self._get_url() + "WsDfu/DFUInfo?ver_=1.31&wsdl"
-            result = utility.get_result(url, modified_path)
+            result = utility.get_result(url, modified_path, logger)
             logger.info("getattr: 2.1. It is a file" + str(_get_sizef(result)))
             return_dict = {
                 'st_ctime': _get_ctimef(result, modified_path),
@@ -240,7 +250,7 @@ class Passthrough(Operations):
     def readdir(self, path, fh):
         def _readdir(modified_path):
             url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
-            result = utility.get_result(url, modified_path)
+            result = utility.get_result(url, modified_path, logger)
             files = [element['Name'].split("::")[-1] for element in result['DFULogicalFiles'] \
                 ['DFULogicalFile'] if element['isDirectory'] is False]
             folders = [element['Directory'] for element in result['DFULogicalFiles'] \
