@@ -58,7 +58,6 @@ class Passthrough(Operations):
             raise ValueError('folder does not exist -- check config.ini')
 
         exact_filesize = config.get('AUX', 'extact_filesize')
-        print exact_filesize
         if exact_filesize == "True" or exact_filesize  == "False": pass
         else:
             raise ValueError('Exact Filesize should be either True or False -- check config.ini')
@@ -309,12 +308,22 @@ class Passthrough(Operations):
         return -1
 
 
-def main(mountpoint, ip="10.239.227.6"):
-    FUSE(Passthrough(ip), mountpoint, nothreads=True, foreground=True)
+def main(mountpoint, ip="10.239.227.6", port="8010"):
+    def check_connection(ip, port):
+        from urllib2 import urlopen, URLError
+        try:
+            urlopen("http://" + ip + ":" + port, timeout=1)
+            return True
+        except URLError as err:
+            return False
+
+    if check_connection(ip, port) is False:
+        raise ValueError('Cannot connect to Cluster: ' + ip + ":" + port)
+    FUSE(Passthrough(ip, port), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
     # Usage: python passthrough_hpcc.py ip mountpoint
     # try:
-    main(sys.argv[2], sys.argv[1])
+        main(sys.argv[3], sys.argv[1], sys.argv[2])
     # except:
-        # print "Usage: python passthrough_hpcc.py ip mountpoint"
+    #     print "Usage: python passthrough_hpcc.py ip port mountpoint"
