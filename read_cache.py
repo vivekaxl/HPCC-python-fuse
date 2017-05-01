@@ -123,8 +123,6 @@ class ReadCache:
         return data
 
     def delete_file(self, filepath):
-        print ">> " * 100, " Delete File: ", filepath
-        # open(filepath, 'w').write("")
         os.remove(filepath)
 
     def invalidate_all_parts(self, path):
@@ -453,6 +451,18 @@ def test1(read_cache):
     else: return False
 
 
+# for testing purposes
+def test1_1(read_cache):
+    """ Check if a new part can be instantiated"""
+    # path = "/vivek/c2_f2_clustering.csv"
+    path = "/vivek/21049.csv"
+    start_byte = 0
+    end_byte = 16384
+    data = read_cache.get_data(path, start_byte, end_byte)
+    if len(data) > 0: return True
+    else: return False
+
+
 def test2(read_cache):
     """ Check if a new part can be instantiated and can be accessed"""
     path = "/vivek/c2_f2_clustering.csv"
@@ -546,7 +556,7 @@ if __name__ == '__main__':
     ip = "10.239.227.6"
     port = "8010"
     read_cache = ReadCache(logger, ip, port)
-    tests = [test1(read_cache), test2(read_cache), test3(read_cache), test4(read_cache)]
+    tests = [test1(read_cache), test1_1(read_cache)]#, test2(read_cache), test3(read_cache), test4(read_cache)]
     for i, test in enumerate(tests):
         if test is not True: print "Test " + str(i+1) + " has failed"
         else: print "Test " + str(i+1) + " has passed"
