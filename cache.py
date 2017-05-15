@@ -18,6 +18,7 @@ class cache():
         return str(config.get('AUX', 'folder'))
 
     def set_entry(self, path, method,  data):
+        self.logger.debug('cache, set_entry| path: ' + path + ' method: ' + method)
         # Implementing LRU
         if len(self.cache) == self.capacity:
             self.cache.popitem(last=False)
@@ -30,8 +31,8 @@ class cache():
     def get_entry(self, path, method):
         try:
             ret_val = self.cache[path][method]
-            self.logger.info('Cached: ' + str(path) + "|" + method )
-            print ret_val
+            self.logger.debug('cache, get_entry| path: ' + str(path) + ", method:" + method )
             return ret_val
         except KeyError:
+            self.logger.error('cache, get_entry| Entry does not exist| path: ' + str(path) + ", method:" + method)
             return None

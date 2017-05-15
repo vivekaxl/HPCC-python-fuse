@@ -24,6 +24,7 @@ def recursive_translation(d):
 
 
 def get_result(url, scope, logging):
+    logging.info("utility.get_result: URL requested: " + url + " Scope: " + scope)
     client = Client(url)
     try:
         try:
@@ -31,7 +32,7 @@ def get_result(url, scope, logging):
         except:
             response = client.service.DFUInfo(Name=scope)
     except MethodNotFound:
-        logging.error('Utility.get_result: Connection Lost')
+        logging.error('Utility.get_result: Connection Lost. URL: ' + url + " scope: " + scope)
     dict = recursive_translation(response)
     return dict
 
@@ -77,6 +78,7 @@ def unix_time(time_string):
     #     return lines
 
 def get_data(url):
+    # self.logging.info("utility| get_data: URL requested: " + url + " Scope: " + scope)
     total_count = -1
     import urllib2
     url = url.replace(' ', '%20')

@@ -59,13 +59,15 @@ class PageTable:
                 del self.page_table[path]
 
     def update_entry(self, path, part_no):
+        self.logger.debug("PageTable| update_entry: " + path + " part_no: " + str(part_no))
         if path not in self.page_table.keys():
-            self.logger.info('PageTable: delete_entry(): The entry does not exists for the path. Something is wrong')
+            self.logger.info('PageTable| update_entry()| The entry does not exists for the path.')
         if part_no not in self.page_table[path].keys():
-            self.logger.info('PageTable: delete_entry(): The entry already exists. Something is wrong')
+            self.logger.info('PageTable| update_entry()| The entry already exists.')
         else:
             # updating only the cache file path.
             cache_file_path = self.aux_folder + path[1:] + "_" + str(part_no)
+            self.logger.info('PageTable| update_entry()| cache_file_path: ' + cache_file_path)
             self.page_table[path][part_no].set_cache_file_path(cache_file_path)
 
     def path_exists(self, path):
@@ -100,6 +102,8 @@ class PageTable:
 
     def get_parts(self, path):
         """ Get all the part numbers"""
+        self.logger.debug("ReadCache| get_parts| Path: " + path)
+        self.logger.debug("ReadCache| get_parts| Path: " + ",".join(self.page_table[path].keys()))
         return self.page_table[path].keys()
 
     def get_cache_left(self, path):
@@ -124,6 +128,7 @@ class PageTable:
 
     def get_page_table_right(self, path):
         part_no = max(self.get_parts(path))
+        self.logger.debug("ReadCache| get_page_table_right| Path: " + path + " part_no: " + part_no)
         return self.get_part(path, part_no)
 
     def get_eof_entry(self, path):
@@ -146,6 +151,7 @@ class PageTable:
 
     def get_part(self, path, part_no):
         """ Return the PageTableEntry of a specific part_no"""
+        self.logger.debug("PageTable| get_part| path: " + path + " part_no: " + str(part_no))
         return self.page_table[path][part_no]
 
     def get_parts_based_byte_position(self, path, start_byte, end_byte):
@@ -175,6 +181,8 @@ class PageTable:
         return False
 
     def get_ranges_of_parts(self, path, part_no):
+        self.logger.debug(
+            "PageTable| get_ranges_of_parts| path: " + path + " part_no: " + str(part_no))
         part = self.get_part(path, part_no)
         return [part.start_byte, part.end_byte]
 

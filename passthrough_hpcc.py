@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # create a file handler
-handler = logging.FileHandler('HISTORY.log')
+handler = logging.RotatingFileHandler('HISTORY.log')
 handler.setLevel(logging.ERROR)
 
 # create a logging format
@@ -98,11 +98,11 @@ class Passthrough(Operations):
     def _cleanup(self):
         """Cleaning up the files stored from the last session"""
         # TODO: Need to add functionality so that the files are deleted at SIGINT
-        logger.info("_cleanup: Clean up started")
+        logger.debug("_cleanup: Clean up started")
         os.system("rm -rf " + TEMP_DIR + "/*")
         os.system("rm -rf ./.AUX/*.p")
         os.system("rm -rf ./.AUX/*")
-        logger.info("_cleanup: Clean up finished")
+        logger.debug("_cleanup: Clean up finished")
 
     def _get_url(self):
         if self.ip != "":
@@ -115,11 +115,13 @@ class Passthrough(Operations):
 
     def _is_file(self, pathname):
         """Check if the pathname passed is a filename of not"""
+        logger.debug("_is_file| pathname: " + str(pathname))
         if pathname == "": modified_path = ""
         elif pathname != "/":
             modified_path = pathname[0] + pathname[1:].replace("/", "::")
         else:
             modified_path = ""
+        logger.info("_is_file| modified_path: " + str(modified_path))
         url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
         result = utility.get_result(url, modified_path, logger)
 
@@ -133,7 +135,7 @@ class Passthrough(Operations):
     def _get_data(self, filename):
         """ Getting data from a filename"""
         url = self._get_url() + "WsDfu/DFUBrowseData?ver_=1.31&wsdl"
-        logger.info("_get_data: {0}".format(url))
+        logger.info("_get_data: url:" + url)
         result = utility.get_data(url, filename)
         logger.info("_get_data: Data returned is " + result)
         return result.encode('utf-8').strip()
@@ -142,27 +144,32 @@ class Passthrough(Operations):
     # ==================
     # Read Only
     def access(self, path, mode):
+        logger.info("access| path: " + str(path))
         return False  # Assumption: All the files are readable by the user
 
     # Read Only
     def getattr(self, path, fh=None):
         def _is_dir(result):
+            logger.info("getattr, _is_dir| result: " + ",".join(result.keys()))
             if 'DFULogicalFiles' in result.keys(): return True
             else: return False
 
         def _get_ctimed(result):
             all_ctime = [utility.unix_time(element['Modified']) for element in result['DFULogicalFiles'] \
                 ['DFULogicalFile'] if element['isDirectory'] is False]
+            logger.info("getattr, _get_ctimed| result: " + ",".join(result.keys()))
             if len(all_ctime) == 0: return 0  # The root directory sometimes have no files
+            logger.info("getattr, _get_ctimed| all_ctime: " + ",".join(all_ctime))
             return max(all_ctime)
 
         def _get_ctimef(result, path):
             if path.split('/')[-1][0] == '.': return -1
-            logger.info("_get_ctimef > " + "path: " + path)
+            logger.info("getattr, _get_ctimef| " + "path: " + path)
             if 'FileDetail' not in result.keys(): return -1
             return utility.unix_time(result['FileDetail']['Modified'])
 
         def _get_sizef(result):
+            logger.info("getattr, _get_sizef|")
             return 10**10
             # TODO return correct filesize
             # return -1
@@ -170,25 +177,32 @@ class Passthrough(Operations):
             # return int(result['FileDetail']['Filesize'].replace(',', ''))
 
         def _get_nlinksf(result):
+            logger.info("getattr, _get_nlinksf|")
             return 1  # the n_links for a file is always 1
 
         def _get_st_modef(result):
+            logger.info("getattr, _get_st_modef|")
             return 33188
 
         def _get_nlinks():
+            logger.info("getattr, _get_nlinks|")
             """ Counts the number of folders in the folder + 2"""
             return len([element['Directory'] for element in result['DFULogicalFiles'] \
                 ['DFULogicalFile'] if element['isDirectory'] is True]) + 2
 
         def _get_st_mode():
+            logger.info("getattr, _get_st_mode|")
             """ refer to http://stackoverflow.com/questions/35375084/c-unix-how-to-extract-the-bits-from-st-mode """
             return 16877
 
-        logger.info("getattr: " + str(path))
+        logger.debug("getattr| path: " + str(path))
 
         cached_entry = self.cache.get_entry(path, 'getattr')
         if cached_entry is not None:
+            logger.info("getattr| path: " + str(path) + " is cached")
             return cached_entry
+        else:
+            logger.info("getattr| path: "+ str(path) + " is not cached")
 
         if path != "/":
             if path.split('/')[-1][0] == '.':
@@ -210,12 +224,12 @@ class Passthrough(Operations):
         else:
             modified_path = ""
 
-        logger.info("getattr: 1. %s", str(modified_path))
+        logger.info("getattr| Modified Path: %s", str(modified_path))
         url = self._get_url() + "WsDfu/DFUFileView?ver_=1.31&wsdl"
-        logger.info("getattr: 2. URL requested : " + str(url))
+        logger.info("getattr| URL requested : " + str(url))
         result = utility.get_result(url, modified_path, logger)
         if _is_dir(result):
-            logger.info("getattr: 2.1. It is a directory")
+            logger.info("getattr| It is a directory")
             return_dict = {
                 'st_ctime': _get_ctimed(result),
                 'st_mtime': _get_ctimed(result),
@@ -230,7 +244,7 @@ class Passthrough(Operations):
         else:
             url = self._get_url() + "WsDfu/DFUInfo?ver_=1.31&wsdl"
             result = utility.get_result(url, modified_path, logger)
-            logger.info("getattr: 2.1. It is a file" + str(_get_sizef(result)))
+            logger.info("getattr|. It is a file" + str(_get_sizef(result)))
             return_dict = {
                 'st_ctime': _get_ctimef(result, modified_path),
                 'st_mtime': _get_ctimef(result, modified_path),
@@ -258,21 +272,25 @@ class Passthrough(Operations):
             # result = [f for f in files.extend(folders) if f.split('/')[0] != '.']
             return files + folders
 
+        logger.debug("readdir| path: " + str(path))
         if path != "/": modified_path = path[1:].replace("/", "::")
         else: modified_path = ""
 
-        logger.info("readdir: 1. %s", modified_path)
+        logger.info("readdir| modified_path: %s" + modified_path)
 
         cached_entry = self.cache.get_entry(modified_path, 'readdir')
         if cached_entry is not None:
+            logger.info("readdir| Entry was cached| modified_path: %s" + modified_path)
             dirents = cached_entry
+            logger.info("readdir| Entry was cached| Files and Folders %s", ",".join(dirents))
         else:
+            logger.info("readdir| Entry was not cached| modified_path: %s" + modified_path)
             dirents = ['.', '..']
             # Need to check if path is a dir but
             # I am checking if it a file or not
             if self._is_file(modified_path) is False:
                 dirents = _readdir(modified_path)
-            logger.info("readdir: 2. files and folders %s", ",".join(dirents))
+            logger.info("readdir| Files and Folders %s", ",".join(dirents))
             self.cache.set_entry(modified_path, 'readdir', dirents)
 
         for r in dirents:
@@ -285,6 +303,7 @@ class Passthrough(Operations):
                        'f_ffree': 6104275, 'f_bfree': 23383842, 'f_namemax': 255,
                        'f_flag': 4097}
         # f_flag has been changes to read only and to not use uids. Rest of the data is junk
+        logger.info("statfs| return_dict.keys():  %s", ",".join(return_dict))
         return return_dict
 
     # File methods
@@ -293,9 +312,7 @@ class Passthrough(Operations):
     def open(self, path, flags):
         # return a dummy because path is passed in during read
         if self.exact_filesize is True:
-            print self.exact_filesize
-            raise Exception('This is the exception you expect to handle')
-            logger.info("open: Exact File size to be fetched for  : " + path)
+            logger.debug("open: Exact File size to be fetched for  : " + path)
             existing_dict = self.cache.get_entry(path, 'getattr')
             file_size = self.read_cache.get_file_size(path)
             logger.info("open: Exact File size: " + str(file_size))
@@ -306,15 +323,17 @@ class Passthrough(Operations):
 
     # Read Only
     def read(self, path, length, offset, fh):
-        print "read: ", path, length, offset
+        logger.debug("read| path: " +  path + " length: " + length + " offset: " + offset)
         data = self.read_cache.get_data(path, offset, offset+length)
         if data == 0:
-            print "EOF reached"
+            logger.debug("read| EOF reached")
             return 0
+        logger.info("read| EOF reached")
         return data
 
     # Read Only
     def release(self, path, fh):
+        logger.debug("release|")
         return -1
 
 
