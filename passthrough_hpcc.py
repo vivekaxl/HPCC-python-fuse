@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # create a file handler
-handler = logging.RotatingFileHandler('HISTORY.log')
+handler = logging.FileHandler('HISTORY.log')
 handler.setLevel(logging.ERROR)
 
 # create a logging format
@@ -159,7 +159,7 @@ class Passthrough(Operations):
                 ['DFULogicalFile'] if element['isDirectory'] is False]
             logger.info("getattr, _get_ctimed| result: " + ",".join(result.keys()))
             if len(all_ctime) == 0: return 0  # The root directory sometimes have no files
-            logger.info("getattr, _get_ctimed| all_ctime: " + ",".join(all_ctime))
+            logger.info("getattr, _get_ctimed| all_ctime: " + ",".join(map(str, all_ctime)))
             return max(all_ctime)
 
         def _get_ctimef(result, path):
