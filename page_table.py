@@ -91,7 +91,7 @@ class PageTable:
         assert (part.if_cached is True), "Something is wrong"
         part.invalidate_cache()
         assert (self.get_part(path, part_no).if_cached is False), "Something is wrong"
-        print ">> ", path, part.get_cache_file_path()
+        # print ">> ", path, part.get_cache_file_path()
         return part.get_cache_file_path()
 
     def part_validate_page(self, path, part_no):
@@ -103,7 +103,7 @@ class PageTable:
     def get_parts(self, path):
         """ Get all the part numbers"""
         self.logger.debug("ReadCache| get_parts| Path: " + path)
-        self.logger.debug("ReadCache| get_parts| Path: " + ",".join(self.page_table[path].keys()))
+        self.logger.debug("ReadCache| get_parts| Path: " + ",".join(map(str, self.page_table[path].keys())))
         return self.page_table[path].keys()
 
     def get_cache_left(self, path):
@@ -128,7 +128,7 @@ class PageTable:
 
     def get_page_table_right(self, path):
         part_no = max(self.get_parts(path))
-        self.logger.debug("ReadCache| get_page_table_right| Path: " + path + " part_no: " + part_no)
+        self.logger.debug("ReadCache| get_page_table_right| Path: " + path + " part_no: " + str(part_no))
         return self.get_part(path, part_no)
 
     def get_eof_entry(self, path):

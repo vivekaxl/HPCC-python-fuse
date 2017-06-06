@@ -15,12 +15,12 @@ import ConfigParser
 TEMP_DIR = "./.AUX/TEMP"
 
 # Adding logger
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # create a file handler
 handler = logging.FileHandler('HISTORY.log')
-handler.setLevel(logging.ERROR)
+handler.setLevel(logging.DEBUG)
 
 # create a logging format
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -323,7 +323,7 @@ class Passthrough(Operations):
 
     # Read Only
     def read(self, path, length, offset, fh):
-        logger.debug("read| path: " +  path + " length: " + length + " offset: " + offset)
+        logger.debug("read| path: " +  path + " length: " + str(length) + " offset: " + str(offset))
         data = self.read_cache.get_data(path, offset, offset+length)
         if data == 0:
             logger.debug("read| EOF reached")
