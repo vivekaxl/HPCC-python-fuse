@@ -46,9 +46,9 @@ class ReadCache:
             end_byte))
         # keys of the page table
         abs_left = self.page_table.get_cache_left(path)
-        self.logger.info("ReadCache| if_cached| abs_left: " + str(abs_left))
+        self.logger.info("ReadCache| if_cached| abs_left: Start Byte: " + str(abs_left.start_byte) + "| End Byte: " + str(abs_left.end_byte))
         abs_right = self.page_table.get_cache_right(path)
-        self.logger.info("ReadCache| if_cached| abs_right: " + str(abs_right))
+        self.logger.info("ReadCache| if_cached| abs_right: Start Byte: " + str(abs_right.start_byte) + "| End Byte: " + str(abs_right.end_byte))
         start = False
         end = False
         if abs_left.start_byte <= start_byte < abs_right.end_byte:
