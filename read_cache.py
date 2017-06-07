@@ -42,7 +42,7 @@ class ReadCache:
         return ret_val
 
     def if_cached(self, path, start_byte, end_byte):
-        self.logger.debug("ReadCache| if_cached| path: " + path + " start_byte: " + str(start_byte) + " end_byte: " + str(
+        self.logger.info("ReadCache| if_cached| path: " + path + " start_byte: " + str(start_byte) + " end_byte: " + str(
             end_byte))
         # keys of the page table
         abs_left = self.page_table.get_cache_left(path)
@@ -51,9 +51,9 @@ class ReadCache:
         self.logger.info("ReadCache| if_cached| abs_right: Start Byte: " + str(abs_right.start_byte) + "| End Byte: " + str(abs_right.end_byte))
         start = False
         end = False
-        if abs_left.start_byte <= start_byte < abs_right.end_byte:
+        if abs_left.start_byte <= start_byte <= abs_right.end_byte:
             start = True
-        if abs_left.start_byte <= end_byte < abs_right.end_byte:
+        if abs_left.start_byte <= end_byte <= abs_right.end_byte:
             end = True
         if end_byte > abs_right.end_byte and abs_right.get_eof() is True:
             end = True
@@ -223,6 +223,32 @@ class ReadCache:
 
     def fill_page_table(self, path):
         self.logger.debug("ReadCache| fill_page_table()| Path: " + path)
+
+        # Get the first 300 records
+        # figure out the number of records
+        modified_path = path[1:].replace("/", "::")
+        self.logger.info("ReadCache| fill_page_table| modified_path| Path: " + modified_path)
+        data = self._get_data(modified_path, 0, self.initial_fetch)
+        # Genereate a random filename
+        temp_filename = self.aux_folder + "temp_" + str(randint(10 ** 4, 10 ** 6))
+        self.logger.info("ReadCache| fill_page_table| temp_filename: " + temp_filename)
+        # Write data into the file to calculate the file size
+        ftest = open(temp_filename, 'w')
+        ftest.write(data)
+        ftest.close()
+        # Find the size of 300 records
+        temp_file_size = os.stat(temp_filename).st_size
+        # size of each record
+        temp_record_size = temp_file_size / self.initial_fetch
+        self.logger.info("ReadCache| fill_page_table| temp_record_size: " + str(temp_record_size))
+        number_of_record_in_cache = int(self.cache_size * 1024 * 1024 / temp_record_size)
+        self.logger.info("ReadCache| fill_page_table| number_of_record_in_cache: " + str(number_of_record_in_cache))
+        self.records_per_part[path] = int(number_of_record_in_cache / 5)
+        self.logger.info(
+            "ReadCache| fill_page_table| self.records_per_part[path]: " + str(self.records_per_part[path]))
+        os.remove(temp_filename)
+
+
         ret_val = 0
         start_record = 0
         fetch_part_no = 0
@@ -234,9 +260,12 @@ class ReadCache:
             if not os.path.exists(parent_path): os.makedirs(parent_path)
 
             if fetch_part_no == 0:
-                ret_val = self.build_cache(path, start_record, fetch_part_no, initial=True)
+                print path
+                print start_record
+                print fetch_part_no
+                ret_val = self.build_cache(path, start_record, fetch_part_no, records_per_part=self.records_per_part[path], initial=True)
             else:
-                ret_val = self.build_cache(path, start_record, fetch_part_no)
+                ret_val = self.build_cache(path, start_record, fetch_part_no, records_per_part=self.records_per_part[path])
             cache_file_path = self.page_table.part_invalidate_page(path, fetch_part_no)
             self.logger.info("ReadCache| fill_page_table| Cache file path invalidated()| cache_file_path: " + cache_file_path)
             self.delete_file(cache_file_path)
