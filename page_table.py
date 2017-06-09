@@ -151,7 +151,7 @@ class PageTable:
 
     def get_part(self, path, part_no):
         """ Return the PageTableEntry of a specific part_no"""
-        self.logger.debug("PageTable| get_part| path: " + path + " part_no: " + str(part_no))
+        self.logger.debug("PageTable| get_part| path>> : " + path + " part_no: " + str(part_no))
         return self.page_table[path][part_no]
 
     def get_parts_based_byte_position(self, path, start_byte, end_byte):

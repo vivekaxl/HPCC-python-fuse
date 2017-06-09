@@ -15,7 +15,7 @@ class ReadCache:
         config = ConfigParser.ConfigParser()
         config.read("./config.ini")
         self.initial_fetch = int(config.get('PageTable', 'initial_fetch'))
-        self.parts_per_cache = int(config.get('PageTable', 'parts_per_cache'))
+        self.parts_per_cache = {}
         self.records_per_part = {}
         self.aux_folder = str(config.get('AUX', 'folder'))
         self.cache_size = float(config.get('PageTable', 'cache_size'))
@@ -51,9 +51,9 @@ class ReadCache:
         self.logger.info("ReadCache| if_cached| abs_right: Start Byte: " + str(abs_right.start_byte) + "| End Byte: " + str(abs_right.end_byte))
         start = False
         end = False
-        if abs_left.start_byte <= start_byte <= abs_right.end_byte:
+        if abs_left.start_byte <= start_byte < abs_right.end_byte:
             start = True
-        if abs_left.start_byte <= end_byte <= abs_right.end_byte:
+        if abs_left.start_byte <= end_byte < abs_right.end_byte:
             end = True
         if end_byte > abs_right.end_byte and abs_right.get_eof() is True:
             end = True
@@ -128,7 +128,8 @@ class ReadCache:
 
     def delete_file(self, filepath):
         self.logger.info("ReadCache| delete_file| Path: " + filepath)
-        os.remove(filepath)
+        open(filepath, 'w').write("")
+        # os.remove(filepath)
 
     def invalidate_all_parts(self, path):
         self.logger.debug("ReadCache: invalidate_all_parts(): Invalidating all cached parts")
@@ -260,15 +261,13 @@ class ReadCache:
             if not os.path.exists(parent_path): os.makedirs(parent_path)
 
             if fetch_part_no == 0:
-                print path
-                print start_record
-                print fetch_part_no
                 ret_val = self.build_cache(path, start_record, fetch_part_no, records_per_part=self.records_per_part[path], initial=True)
             else:
                 ret_val = self.build_cache(path, start_record, fetch_part_no, records_per_part=self.records_per_part[path])
-            cache_file_path = self.page_table.part_invalidate_page(path, fetch_part_no)
-            self.logger.info("ReadCache| fill_page_table| Cache file path invalidated()| cache_file_path: " + cache_file_path)
-            self.delete_file(cache_file_path)
+            if fetch_part_no >= 5: #TODO: need to change this to a more meaningful number
+                cache_file_path = self.page_table.part_invalidate_page(path, fetch_part_no)
+                self.logger.info("ReadCache| fill_page_table| Cache file path invalidated()| cache_file_path: " + cache_file_path)
+                self.delete_file(cache_file_path)
             start_record += self.records_per_part[path]
             fetch_part_no += 1
 
