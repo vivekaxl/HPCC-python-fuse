@@ -1,5 +1,6 @@
 # filename = '/home/osboxes/GIT/mount_pnt2/vivek/c_ecolids.csv'
-filename = '/home/osboxes/GIT/mount_pnt2/vn/dsoutput'
+# filename = '/home/osboxes/GIT/mount_pnt2/vn/dsoutput'
+filename = '/home/osboxes/GIT/mount_pnt2/fuse_testing/childds1'
 # filename = '/home/osboxes/GIT/mount_pnt2/vn/21049'
 count = 1
 with open(filename, 'r') as f:

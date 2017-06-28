@@ -4,6 +4,7 @@ from datetime import datetime
 from dateutil import parser
 from suds import MethodNotFound
 from bs4 import BeautifulSoup
+import re
 
 
 def recursive_translation(d):
@@ -82,13 +83,24 @@ def get_data(url):
     total_count = -1
     import urllib2
     url = url.replace(' ', '%20')
+    print url
     # Download the content of the page
     response = urllib2.urlopen(url)
     html = response.read()
-    data = html.split('\"Row\": ')[-1][1:-4].replace('\n','').replace('},', '}||')
-    try:
-        # This would only work for thor files
-        total_count = [int(l.strip().split(":")[-1].strip()) for l in html.split(',') if "Total" in l][-1]
-    except:
-        pass
-    return '\n'.join([d.strip() for d in data.split('||')]), total_count
+    #
+    # f = open('write_normal.txt', 'w')
+    # f.write(html)
+    # f.close()
+    # exit()
+
+    regexp = re.search("\"@xmlSchema(.*\n)*.*}}}$", html, re.M)
+    filter1 = regexp.group()
+    regexp = re.search("\"Row\":(.*\n)*.*}}}$", filter1, re.M)
+    filter2 = "{" + regexp.group()
+    import json
+    j = json.loads(filter2[:-2])
+
+    # data = html.split('\"Row\": ')[-1][1:-4].replace('\n','').replace('},', '}||')
+    total_count = int(re.search("\"Total\": \d*", html).group().replace('\"Total\": ', ''))
+
+    return "\n".join([json.dumps(r) for r in j['Row']]), total_count
