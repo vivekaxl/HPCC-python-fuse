@@ -83,7 +83,6 @@ def get_data(url):
     total_count = -1
     import urllib2
     url = url.replace(' ', '%20')
-    print url
     # Download the content of the page
     response = urllib2.urlopen(url)
     html = response.read()

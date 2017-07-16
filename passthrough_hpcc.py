@@ -15,7 +15,7 @@ import ConfigParser
 TEMP_DIR = "./.AUX/TEMP"
 
 # Adding logger
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # create a file handler
@@ -163,6 +163,7 @@ class Passthrough(Operations):
             return max(all_ctime)
 
         def _get_ctimef(result, path):
+            if path == "": return -1
             if path.split('/')[-1][0] == '.': return -1
             logger.info("getattr, _get_ctimef| " + "path: " + path)
             if 'FileDetail' not in result.keys(): return -1
@@ -203,7 +204,7 @@ class Passthrough(Operations):
             return cached_entry
         else:
             logger.info("getattr| path: "+ str(path) + " is not cached")
-
+        if path == "": return
         if path != "/":
             if path.split('/')[-1][0] == '.':
                 return_dict = {
@@ -326,7 +327,7 @@ class Passthrough(Operations):
         logger.debug("read| path: " +  path + " length: " + str(length) + " offset: " + str(offset))
         data = self.read_cache.get_data(path, offset, offset+length)
         if data == 0:
-            logger.debug("read| EOF reached")
+            logger.debug("read| EOF reached (data=0)")
             return 0
         logger.info("read| EOF reached")
         return data
